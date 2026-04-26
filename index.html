@@ -1,1 +1,751 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+    <title>TabTime — умные напоминания о лекарствах</title>
+    
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.0.0/css/all.min.css">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E💊%3C/text%3E%3C/svg%3E">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
 
+        :root {
+            --bg-page: #ffffff;
+            --bg-surface: #f0f2f5;
+            --card-bg: #ffffff;
+            --text-primary: #0a0a0a;
+            --text-secondary: #5e5e5e;
+            --accent: #40a7e3;
+            --accent-dark: #2e8ec0;
+            --border: #e0e0e0;
+            --danger: #e64646;
+            --warning: #ffb443;
+            --success: #34c759;
+            --shadow: 0 2px 8px rgba(0, 0, 0, 0.04), 0 4px 12px rgba(0, 0, 0, 0.06);
+            --nav-bg: rgba(255,255,255,0.96);
+            --transition: all 0.25s cubic-bezier(0.2, 0.9, 0.4, 1.1);
+        }
+
+        body.dark {
+            --bg-page: #0f0f0f;
+            --bg-surface: #1c1c1e;
+            --card-bg: #252528;
+            --text-primary: #f0f0f0;
+            --text-secondary: #a0a0a0;
+            --border: #2c2c2e;
+            --shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            --nav-bg: rgba(28,28,30,0.96);
+        }
+
+        body {
+            font-family: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: var(--bg-page);
+            color: var(--text-primary);
+            transition: background 0.3s ease, color 0.3s ease;
+            padding-bottom: 75px;
+        }
+
+        .app-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: var(--bg-page);
+            min-height: 100vh;
+        }
+
+        /* ========== УЛУЧШЕННЫЕ АНИМАЦИИ ========== */
+        
+        /* Анимация появления панелей с зумом */
+        .panel {
+            display: none;
+            padding: 20px;
+            animation: panelAppear 0.35s cubic-bezier(0.2, 0.9, 0.4, 1.1) forwards;
+        }
+        @keyframes panelAppear {
+            from {
+                opacity: 0;
+                transform: scale(0.98) translateY(8px);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+        .panel.active-panel {
+            display: block;
+        }
+
+        /* Анимация появления карточек с каскадной задержкой */
+        .card {
+            background: var(--card-bg);
+            border-radius: 24px;
+            padding: 16px;
+            margin-bottom: 16px;
+            box-shadow: var(--shadow);
+            border: 0.5px solid var(--border);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            animation: cardFadeIn 0.3s ease-out backwards;
+        }
+        .card:nth-child(1) { animation-delay: 0.05s; }
+        .card:nth-child(2) { animation-delay: 0.10s; }
+        .card:nth-child(3) { animation-delay: 0.15s; }
+        .card:nth-child(4) { animation-delay: 0.20s; }
+        .card:nth-child(5) { animation-delay: 0.25s; }
+        @keyframes cardFadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(12px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Эффект при нажатии на карточку (микро-отклик) */
+        .card:active {
+            transform: scale(0.99);
+            box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+        }
+
+        /* Кнопка темы с плавным вращением */
+        .theme-toggle {
+            background: var(--bg-surface);
+            border: none;
+            border-radius: 30px;
+            padding: 8px 12px;
+            color: var(--text-primary);
+            cursor: pointer;
+            font-size: 1.2rem;
+            transition: transform 0.3s cubic-bezier(0.34, 1.2, 0.64, 1), background 0.2s;
+        }
+        .theme-toggle:active {
+            transform: rotate(25deg) scale(0.92);
+            background: var(--border);
+        }
+
+        /* Нижнее меню с анимацией при наведении (активный пункт) */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            max-width: 600px;
+            margin: 0 auto;
+            background: var(--nav-bg);
+            backdrop-filter: blur(20px);
+            display: flex;
+            justify-content: space-around;
+            padding: 8px 16px 20px;
+            border-top: 1px solid var(--border);
+            z-index: 20;
+        }
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 0.7rem;
+            gap: 4px;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.2, 0.9, 0.4, 1.1);
+            padding: 6px 12px;
+            border-radius: 40px;
+        }
+        .nav-item i {
+            font-size: 1.4rem;
+            transition: transform 0.2s ease, color 0.2s;
+        }
+        .nav-item:active i {
+            transform: scale(0.88);
+        }
+        .nav-item.active {
+            color: var(--accent);
+            background: var(--bg-surface);
+            transform: translateY(-2px);
+        }
+        .nav-item.active i {
+            transform: scale(1.05);
+        }
+
+        /* Кнопки с ripple-эффектом (псевдоэлемент) */
+        .btn-primary, .btn-outline, .btn-danger {
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.15s ease, background 0.2s, color 0.2s;
+        }
+        .btn-primary:active, .btn-outline:active, .btn-danger:active {
+            transform: scale(0.96);
+        }
+        /* ripple эффект при клике (динамически добавляется через JS, но базово: ) */
+        .ripple {
+            position: absolute;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.5);
+            transform: scale(0);
+            animation: rippleAnim 0.4s linear;
+            pointer-events: none;
+        }
+        @keyframes rippleAnim {
+            to {
+                transform: scale(4);
+                opacity: 0;
+            }
+        }
+
+        /* Анимация для модальных окон */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5);
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            backdrop-filter: blur(3px);
+        }
+        .modal-card {
+            background: var(--card-bg);
+            width: 90%;
+            max-width: 480px;
+            border-radius: 32px;
+            padding: 24px;
+            max-height: 85vh;
+            overflow-y: auto;
+            animation: modalPop 0.25s cubic-bezier(0.2, 0.9, 0.4, 1.2);
+        }
+        @keyframes modalPop {
+            from {
+                opacity: 0;
+                transform: scale(0.92);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        /* Остальные стили без изменений (сохранены для краткости) */
+        .header { position: sticky; top: 0; background: var(--bg-page); backdrop-filter: blur(12px); padding: 14px 20px; display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid var(--border); z-index: 10; }
+        .logo h1 { font-size: 1.65rem; font-weight: 600; background: linear-gradient(135deg, var(--accent), #2c7cb6); -webkit-background-clip: text; background-clip: text; color: transparent; }
+        .logo span { font-size: 0.7rem; color: var(--text-secondary); font-weight: normal; }
+        .btn-primary { background: var(--accent); border: none; color: white; padding: 10px 16px; border-radius: 40px; font-weight: 500; width: 100%; font-size: 1rem; cursor: pointer; margin-top: 8px; }
+        .btn-outline { background: transparent; border: 1px solid var(--accent); color: var(--accent); border-radius: 40px; padding: 8px 14px; cursor: pointer; }
+        .btn-danger { background: transparent; border: 1px solid var(--danger); color: var(--danger); border-radius: 40px; padding: 8px 14px; cursor: pointer; }
+        .btn-icon { background: none; border: none; font-size: 1.2rem; cursor: pointer; color: var(--text-secondary); padding: 8px; transition: transform 0.1s; }
+        .btn-icon:active { transform: scale(0.88); }
+        .time-badge { background: var(--bg-surface); border-radius: 30px; padding: 4px 12px; font-size: 0.75rem; display: inline-flex; align-items: center; gap: 6px; margin-right: 8px; margin-bottom: 6px; }
+        .status-badge { font-size: 0.7rem; padding: 4px 8px; border-radius: 20px; }
+        .status-taken { background: var(--success); color: #fff; }
+        .status-missed { background: var(--danger); color: #fff; }
+        .status-pending { background: var(--warning); color: #1e1e1e; }
+        .modal-card input, .modal-card select { width: 100%; padding: 12px; margin: 8px 0; border-radius: 16px; border: 1px solid var(--border); background: var(--bg-surface); color: var(--text-primary); font-family: inherit; }
+        .dosage-group { display: flex; gap: 8px; align-items: center; }
+        .dosage-group input { flex: 2; margin: 0; }
+        .dosage-group select { flex: 1; margin: 0; }
+        .schedule-group { background: var(--bg-surface); border-radius: 20px; padding: 12px; margin-bottom: 16px; border: 1px solid var(--border); }
+        .schedule-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
+        .schedule-row select, .schedule-row input { flex: 1; margin: 0; }
+        .remove-schedule { background: none; border: none; color: var(--danger); font-size: 1.2rem; cursor: pointer; }
+        .empty-state { text-align: center; color: var(--text-secondary); padding: 40px; }
+        .settings-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .text-secondary { color: var(--text-secondary); font-size: 0.85rem; }
+        .double-progress { background: var(--bg-surface); border-radius: 20px; height: 12px; overflow: hidden; display: flex; margin: 12px 0; }
+        .progress-taken { background: var(--success); height: 100%; width: 0%; transition: width 0.5s ease-out; }
+        .progress-missed { background: var(--danger); height: 100%; width: 0%; transition: width 0.5s ease-out; }
+        .profile-header { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
+        .profile-avatar { width: 70px; height: 70px; background: var(--accent); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 2rem; color: white; box-shadow: 0 4px 12px rgba(0,0,0,0.1); transition: transform 0.2s; }
+        .profile-avatar:active { transform: scale(0.96); }
+        .profile-name { font-size: 1.3rem; font-weight: 600; }
+        .profile-bio { font-size: 0.8rem; color: var(--text-secondary); margin-top: 4px; }
+        .stats-grid { display: flex; justify-content: space-between; margin-top: 16px; gap: 12px; }
+        .stat-card { background: var(--bg-surface); border-radius: 20px; padding: 12px; text-align: center; flex: 1; transition: transform 0.2s; }
+        .stat-card:active { transform: scale(0.97); }
+        .stat-number { font-size: 1.6rem; font-weight: 700; }
+        .profile-row { display: flex; justify-content: space-between; margin: 12px 0; }
+    </style>
+</head>
+<body>
+<div class="app-container">
+    <div class="header">
+        <div class="logo">
+            <h1>TabTime <span>v02.26.04</span></h1>
+        </div>
+        <button class="theme-toggle" id="themeToggleBtn"><i class="fas fa-moon"></i></button>
+    </div>
+
+    <!-- Статистика -->
+    <div id="cabinetPanel" class="panel">
+        <div class="card">
+            <div class="profile-header" id="profileHeader"></div>
+            <h3><i class="fas fa-chart-line"></i> Общая статистика</h3>
+            <div class="double-progress">
+                <div class="progress-taken" id="progressTakenFill"></div>
+                <div class="progress-missed" id="progressMissedFill"></div>
+            </div>
+            <div class="stats-grid">
+                <div class="stat-card"><div class="stat-number" id="takenCount">0</div><div><i class="fas fa-check-circle"></i> Принято</div></div>
+                <div class="stat-card"><div class="stat-number" id="missedCount">0</div><div><i class="fas fa-times-circle"></i> Пропущено</div></div>
+                <div class="stat-card"><div class="stat-number" id="totalCount">0</div><div><i class="fas fa-chart-simple"></i> Всего</div></div>
+            </div>
+            <div style="margin-top: 12px; text-align: center; font-size: 0.85rem;" id="ratingPercentText">0% выполнено</div>
+        </div>
+        <div class="card">
+            <h3><i class="fas fa-info-circle"></i> О приложении</h3>
+            <p>Напоминания повторяются <strong>7 минут</strong> (каждые 2 минуты), затем просрочка с уведомлением. Данные локально.</p>
+        </div>
+    </div>
+
+    <!-- Аптечка -->
+    <div id="medicinePanel" class="panel active-panel">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <h2><i class="fas fa-kit-medical"></i> Моя аптечка</h2>
+            <button class="btn-outline" id="addMedBtn"><i class="fas fa-plus"></i> Добавить</button>
+        </div>
+        <div id="medicinesList"></div>
+    </div>
+
+    <!-- Сегодня -->
+    <div id="todayPanel" class="panel">
+        <h2 style="margin-bottom: 12px;"><i class="fas fa-bell"></i> Сегодняшний приём</h2>
+        <div id="todayReminders"></div>
+    </div>
+
+    <!-- Настройки -->
+    <div id="settingsPanel" class="panel">
+        <div class="card">
+            <h3><i class="fas fa-user-edit"></i> Профиль</h3>
+            <div id="profilePreviewSettings"></div>
+            <button class="btn-outline" id="editProfileBtnSettings" style="margin-top: 8px;"><i class="fas fa-pen"></i> Редактировать профиль</button>
+        </div>
+        <div class="card">
+            <h3><i class="fas fa-bell"></i> Уведомления</h3>
+            <div class="settings-item">
+                <span><i class="fas fa-envelope"></i> Разрешить уведомления</span>
+                <button id="requestNotifBtn" class="btn-outline">Запросить</button>
+            </div>
+            <p class="text-secondary">Статус: <span id="notifStatus">неизвестно</span></p>
+        </div>
+        <div class="card">
+            <h3><i class="fas fa-database"></i> Данные</h3>
+            <div class="settings-item">
+                <span><i class="fas fa-chart-simple"></i> Сбросить рейтинг</span>
+                <button id="resetRatingBtn" class="btn-danger">Сбросить</button>
+            </div>
+            <div class="settings-item">
+                <span><i class="fas fa-trash-alt"></i> Полный сброс всех данных</span>
+                <button id="resetAllBtn" class="btn-danger">Сбросить всё</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="bottom-nav">
+        <button class="nav-item" data-panel="cabinet"><i class="fas fa-chart-pie"></i><span>Статистика</span></button>
+        <button class="nav-item active" data-panel="medicine"><i class="fas fa-pills"></i><span>Аптечка</span></button>
+        <button class="nav-item" data-panel="today"><i class="fas fa-calendar-day"></i><span>Сегодня</span></button>
+        <button class="nav-item" data-panel="settings"><i class="fas fa-sliders-h"></i><span>Настройки</span></button>
+    </div>
+</div>
+
+<!-- Модальные окна -->
+<div id="medModal" class="modal"><div class="modal-card"><h3 id="modalTitle">Добавить лекарство</h3><input type="text" id="medName" placeholder="Название"><div class="dosage-group"><input type="number" id="dosageValue" placeholder="Количество" step="any"><select id="dosageUnit"><option value="мг">мг</option><option value="мл">мл</option><option value="таб.">таб.</option><option value="капли">капли</option><option value="ложки">ложки</option><option value="шт.">шт.</option></select></div><div id="schedulesContainer"></div><button id="addScheduleBtn" class="btn-outline" style="margin: 10px 0;"><i class="fas fa-plus-circle"></i> Добавить время</button><div style="display: flex; gap: 12px; margin-top: 16px;"><button id="saveMedBtn" class="btn-primary">Сохранить</button><button id="closeModalBtn" class="btn-outline">Отмена</button></div></div></div>
+<div id="profileModal" class="modal"><div class="modal-card"><h3>Редактировать профиль</h3><input type="text" id="profileName" placeholder="Имя"><input type="number" id="profileAge" placeholder="Возраст"><select id="profileGender"><option value="">Пол</option><option>Мужской</option><option>Женский</option></select><input type="number" id="profileHeight" placeholder="Рост (см)"><input type="number" id="profileWeight" placeholder="Вес (кг)"><div style="display: flex; gap: 12px; margin-top: 16px;"><button id="saveProfileBtn" class="btn-primary">Сохранить</button><button id="closeProfileBtn" class="btn-outline">Закрыть</button></div></div></div>
+
+<script>
+    // ---------- ДАННЫЕ ---------- (полностью сохранены, добавлен ripple эффект для кнопок)
+    let medications = [];
+    let intakeHistory = [];
+    let profile = { name: "", age: "", gender: "", height: "", weight: "" };
+    let activeReminders = new Map();
+    const GRACE_MINUTES = 7;
+    const REMINDER_INTERVAL_MS = 2 * 60 * 1000;
+    const todayStr = () => new Date().toISOString().slice(0,10);
+
+    function isRepeatMatchToday(repeatType, intervalDays, refDateISO) {
+        if (!refDateISO) return false;
+        const refDate = new Date(refDateISO); refDate.setHours(0,0,0,0);
+        const today = new Date(); today.setHours(0,0,0,0);
+        const diffDays = Math.floor((today - refDate) / (1000*3600*24));
+        if (diffDays < 0) return false;
+        if (repeatType === "daily") return true;
+        if (repeatType === "weekly") return diffDays % 7 === 0;
+        if (repeatType === "biweekly") return diffDays % 14 === 0;
+        if (repeatType === "triweekly") return diffDays % 21 === 0;
+        if (repeatType === "custom" && intervalDays > 0) return diffDays % intervalDays === 0;
+        return false;
+    }
+    function formatDosage(val, unit) { return (val && unit) ? `${val} ${unit}` : ""; }
+
+    function loadData() {
+        const m = localStorage.getItem("tabtime_medications");
+        if(m) medications = JSON.parse(m);
+        const h = localStorage.getItem("tabtime_history");
+        if(h) intakeHistory = JSON.parse(h);
+        const p = localStorage.getItem("tabtime_profile");
+        if(p) profile = JSON.parse(p);
+        if(!medications) medications = [];
+        if(!intakeHistory) intakeHistory = [];
+        if(!profile) profile = { name: "", age: "", gender: "", height: "", weight: "" };
+    }
+    function saveMeds() { localStorage.setItem("tabtime_medications", JSON.stringify(medications)); }
+    function saveHistory() { localStorage.setItem("tabtime_history", JSON.stringify(intakeHistory)); }
+    function saveProfile() { localStorage.setItem("tabtime_profile", JSON.stringify(profile)); }
+
+    function getIntakeStatus(medId, schedIdx, dateStr) {
+        return intakeHistory.find(e => e.medId === medId && e.scheduleIdx === schedIdx && e.dateStr === dateStr);
+    }
+    function setIntakeStatus(medId, schedIdx, dateStr, timeStr, status) {
+        const existing = getIntakeStatus(medId, schedIdx, dateStr);
+        if(existing) { existing.status = status; existing.timestamp = Date.now(); }
+        else { intakeHistory.push({ medId, scheduleIdx: schedIdx, dateStr, timeStr, status, timestamp: Date.now() }); }
+        saveHistory();
+        stopReminder(medId, schedIdx, dateStr);
+        if(status === "missed") {
+            const med = medications.find(m => m.id === medId);
+            if(med) showNotif(`Просрочка! ${med.name} (${timeStr}) не принят.`);
+        }
+        renderTodayPanel(); renderCabinet(); renderSettings();
+    }
+    function stopReminder(medId, schedIdx, dateStr) {
+        const key = `${medId}_${schedIdx}_${dateStr}`;
+        if(activeReminders.has(key)) { clearInterval(activeReminders.get(key)); activeReminders.delete(key); }
+    }
+    function showNotif(body) { if (Notification.permission === "granted") new Notification("TabTime", { body }); }
+
+    function startReminderNotification(med, schedIdx, schedule, dateStr) {
+        const key = `${med.id}_${schedIdx}_${dateStr}`;
+        if(activeReminders.has(key)) return;
+        const timeStr = schedule.time;
+        const scheduleTime = new Date(`${dateStr}T${timeStr}:00`);
+        const now = new Date();
+        if(now > scheduleTime && (now - scheduleTime) > GRACE_MINUTES*60000) {
+            setIntakeStatus(med.id, schedIdx, dateStr, timeStr, "missed");
+            return;
+        }
+        const intervalId = setInterval(() => {
+            const current = new Date();
+            const diffMin = (current - scheduleTime) / 60000;
+            if(diffMin > GRACE_MINUTES) {
+                setIntakeStatus(med.id, schedIdx, dateStr, timeStr, "missed");
+                stopReminder(med.id, schedIdx, dateStr);
+                renderTodayPanel();
+                return;
+            }
+            showNotif(`Напоминание: примите ${med.name} ${med.dosageStr ? `(${med.dosageStr})` : ''} в ${timeStr}`);
+            renderTodayPanel();
+        }, REMINDER_INTERVAL_MS);
+        activeReminders.set(key, intervalId);
+        if(new Date() >= scheduleTime) showNotif(`Напоминание: примите ${med.name} в ${timeStr}`);
+    }
+
+    function getTodaySchedules() {
+        const today = todayStr();
+        const results = [];
+        medications.forEach(med => {
+            med.schedules.forEach((sched, idx) => {
+                if(isRepeatMatchToday(sched.repeatType, sched.intervalDays, sched.refDateISO))
+                    results.push({ med, scheduleIdx: idx, schedule: sched, dateStr: today, timeStr: sched.time });
+            });
+        });
+        return results;
+    }
+
+    function checkAndStartTodayReminders() {
+        const today = todayStr();
+        medications.forEach(med => {
+            med.schedules.forEach((sched, idx) => {
+                if(!isRepeatMatchToday(sched.repeatType, sched.intervalDays, sched.refDateISO)) return;
+                const status = getIntakeStatus(med.id, idx, today);
+                if(status && (status.status === "taken" || status.status === "missed")) return;
+                const scheduleTime = new Date(`${today}T${sched.time}:00`);
+                const now = new Date();
+                if(now >= scheduleTime) {
+                    const diff = (now - scheduleTime)/60000;
+                    if(diff > GRACE_MINUTES) setIntakeStatus(med.id, idx, today, sched.time, "missed");
+                    else startReminderNotification(med, idx, sched, today);
+                }
+            });
+        });
+    }
+
+    let globalWatch = null;
+    function startGlobalWatch() {
+        if(globalWatch) clearInterval(globalWatch);
+        globalWatch = setInterval(() => {
+            const today = todayStr();
+            medications.forEach(med => {
+                med.schedules.forEach((sched, idx) => {
+                    if(!isRepeatMatchToday(sched.repeatType, sched.intervalDays, sched.refDateISO)) return;
+                    const status = getIntakeStatus(med.id, idx, today);
+                    if(status && (status.status === "taken" || status.status === "missed")) return;
+                    const scheduleTime = new Date(`${today}T${sched.time}:00`);
+                    const now = new Date();
+                    if(now >= scheduleTime) {
+                        const diff = (now - scheduleTime)/60000;
+                        if(diff > GRACE_MINUTES) setIntakeStatus(med.id, idx, today, sched.time, "missed");
+                        else if(!activeReminders.has(`${med.id}_${idx}_${today}`))
+                            startReminderNotification(med, idx, sched, today);
+                    }
+                });
+            });
+            renderTodayPanel(); renderCabinet(); renderSettings();
+        }, 30000);
+    }
+
+    // ========== UI RENDER (c сохранением всей логики) ==========
+    function renderMedicines() {
+        const container = document.getElementById("medicinesList");
+        if(!medications.length) { container.innerHTML = `<div class="empty-state"><i class="fas fa-capsules"></i><p>Добавьте лекарство</p></div>`; return; }
+        container.innerHTML = medications.map(med => {
+            const schedulesHtml = med.schedules.map(s => {
+                let label = "";
+                if(s.repeatType === "daily") label = "каждый день";
+                else if(s.repeatType === "weekly") label = "каждую неделю";
+                else if(s.repeatType === "biweekly") label = "раз в 2 нед.";
+                else if(s.repeatType === "triweekly") label = "раз в 3 нед.";
+                else label = `каждые ${s.intervalDays} дн.`;
+                return `<span class="time-badge"><i class="far fa-clock"></i> ${s.time} · ${label}</span>`;
+            }).join('');
+            return `<div class="card"><div style="display:flex;justify-content:space-between;"><div><strong>${escapeHtml(med.name)}</strong> <span style="color:var(--text-secondary)">${escapeHtml(med.dosageStr || '')}</span></div><div><button class="btn-icon editMedBtn" data-id="${med.id}"><i class="fas fa-edit"></i></button><button class="btn-icon deleteMedBtn" data-id="${med.id}"><i class="fas fa-trash-alt"></i></button></div></div><div class="med-times">${schedulesHtml}</div></div>`;
+        }).join('');
+        attachMedicineEvents();
+    }
+    function attachMedicineEvents() {
+        document.querySelectorAll('.editMedBtn').forEach(btn => btn.addEventListener('click', () => openMedModal(parseInt(btn.dataset.id))));
+        document.querySelectorAll('.deleteMedBtn').forEach(btn => btn.addEventListener('click', () => deleteMedicine(parseInt(btn.dataset.id))));
+    }
+
+    function renderTodayPanel() {
+        const container = document.getElementById("todayReminders");
+        const items = getTodaySchedules();
+        if(!items.length) { container.innerHTML = `<div class="empty-state">Сегодня нет приёма</div>`; return; }
+        let html = '';
+        items.forEach(item => {
+            const st = getIntakeStatus(item.med.id, item.scheduleIdx, item.dateStr);
+            let status = st ? st.status : "pending";
+            let cls = status === "taken" ? "status-taken" : (status === "missed" ? "status-missed" : "status-pending");
+            let txt = status === "taken" ? "Принято" : (status === "missed" ? "Пропущено" : "Ожидает");
+            let repeatLabel = "";
+            if(item.schedule.repeatType === "daily") repeatLabel = "ежедневно";
+            else if(item.schedule.repeatType === "weekly") repeatLabel = "еженедельно";
+            else if(item.schedule.repeatType === "biweekly") repeatLabel = "раз в 2 нед.";
+            else repeatLabel = `кажд. ${item.schedule.intervalDays} дн.`;
+            html += `<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;"><div><strong>${escapeHtml(item.med.name)}</strong> ${item.med.dosageStr ? `(${item.med.dosageStr})` : ''}<br><span class="time-badge"><i class="far fa-clock"></i> ${item.timeStr} · ${repeatLabel}</span><span class="status-badge ${cls}">${txt}</span></div>${status === "pending" ? `<button class="btn-outline takeBtn" data-medid="${item.med.id}" data-schedidx="${item.scheduleIdx}" data-time="${item.timeStr}">Принял(а)</button>` : ''}</div></div>`;
+        });
+        container.innerHTML = html;
+        document.querySelectorAll('.takeBtn').forEach(btn => btn.addEventListener('click', () => {
+            const medId = parseInt(btn.dataset.medid), idx = parseInt(btn.dataset.schedidx), time = btn.dataset.time;
+            setIntakeStatus(medId, idx, todayStr(), time, "taken");
+            showNotif("Приём подтверждён!");
+            renderTodayPanel(); renderCabinet(); renderSettings();
+        }));
+    }
+
+    function renderCabinet() {
+        const ph = document.getElementById("profileHeader");
+        ph.innerHTML = `<div class="profile-avatar"><i class="fas fa-user"></i></div><div class="profile-details"><div class="profile-name">${escapeHtml(profile.name || 'Гость')}</div><div class="profile-bio">${profile.age ? profile.age+' лет' : ''} ${profile.gender ? `· ${profile.gender}` : ''}<br>${profile.height ? 'Рост '+profile.height+' см' : ''} ${profile.weight ? 'Вес '+profile.weight+' кг' : ''}</div></div>`;
+        let taken = 0, missed = 0;
+        intakeHistory.forEach(rec => { if(rec.status === "taken") taken++; else if(rec.status === "missed") missed++; });
+        const total = taken + missed;
+        const takenPercent = total === 0 ? 0 : (taken / total) * 100;
+        const missedPercent = total === 0 ? 0 : (missed / total) * 100;
+        document.getElementById("progressTakenFill").style.width = `${takenPercent}%`;
+        document.getElementById("progressMissedFill").style.width = `${missedPercent}%`;
+        document.getElementById("takenCount").innerText = taken;
+        document.getElementById("missedCount").innerText = missed;
+        document.getElementById("totalCount").innerText = total;
+        document.getElementById("ratingPercentText").innerHTML = total === 0 ? "0% выполнено" : `${Math.round(takenPercent)}% выполнено`;
+    }
+
+    function renderSettings() {
+        const preview = document.getElementById("profilePreviewSettings");
+        preview.innerHTML = `<div class="profile-row"><i class="fas fa-user"></i> Имя: <strong>${escapeHtml(profile.name || 'Не указано')}</strong></div>
+            <div class="profile-row"><i class="fas fa-calendar-alt"></i> Возраст: ${profile.age || '—'}</div>
+            <div class="profile-row"><i class="fas fa-venus-mars"></i> Пол: ${profile.gender || '—'}</div>
+            <div class="profile-row"><i class="fas fa-ruler"></i> Рост/Вес: ${profile.height||'—'} см / ${profile.weight||'—'} кг</div>`;
+        const ns = document.getElementById("notifStatus");
+        if(Notification.permission === "granted") ns.innerText = "разрешены";
+        else if(Notification.permission === "denied") ns.innerText = "заблокированы";
+        else ns.innerText = "не запрошены";
+    }
+
+    function deleteMedicine(id) {
+        if(confirm("Удалить лекарство?")) {
+            medications = medications.filter(m => m.id !== id);
+            saveMeds();
+            intakeHistory = intakeHistory.filter(h => h.medId !== id);
+            saveHistory();
+            for(let [key, iv] of activeReminders) if(key.startsWith(`${id}_`)) { clearInterval(iv); activeReminders.delete(key); }
+            renderMedicines(); renderTodayPanel(); renderCabinet(); renderSettings();
+        }
+    }
+
+    let editingMedId = null, tempSchedules = [];
+    function renderScheduleInputs() {
+        const cont = document.getElementById("schedulesContainer");
+        cont.innerHTML = "";
+        tempSchedules.forEach((sch, idx) => {
+            const div = document.createElement("div"); div.className = "schedule-group";
+            let opts = `<option value="daily" ${sch.repeatType==="daily"?"selected":""}>Каждый день</option><option value="weekly" ${sch.repeatType==="weekly"?"selected":""}>Раз в неделю</option><option value="biweekly" ${sch.repeatType==="biweekly"?"selected":""}>Раз в 2 недели</option><option value="triweekly" ${sch.repeatType==="triweekly"?"selected":""}>Раз в 3 недели</option><option value="custom" ${sch.repeatType==="custom"?"selected":""}>Свой интервал</option>`;
+            let custom = (sch.repeatType === "custom") ? `<input type="number" class="custom-interval" placeholder="Дней" value="${sch.intervalDays||1}" style="margin-top:6px;">` : '';
+            div.innerHTML = `<div class="schedule-row"><input type="time" value="${sch.time}" class="sch-time" data-idx="${idx}" style="flex:2;"><select class="sch-repeat" data-idx="${idx}">${opts}</select><button class="remove-schedule" data-idx="${idx}"><i class="fas fa-trash"></i></button></div><div class="custom-interval-container">${custom}</div>`;
+            cont.appendChild(div);
+        });
+        document.querySelectorAll('.sch-time').forEach(inp => inp.addEventListener('change', e => { let i = parseInt(inp.dataset.idx); tempSchedules[i].time = inp.value; }));
+        document.querySelectorAll('.sch-repeat').forEach(sel => sel.addEventListener('change', e => { let i = parseInt(sel.dataset.idx); tempSchedules[i].repeatType = sel.value; if(sel.value!=="custom") tempSchedules[i].intervalDays = (sel.value==="daily"?1: (sel.value==="weekly"?7: (sel.value==="biweekly"?14:21))); renderScheduleInputs(); }));
+        document.querySelectorAll('.custom-interval').forEach(inp => inp.addEventListener('change', e => { let containerDiv = inp.closest('.schedule-group'); let idxAttr = containerDiv.querySelector('.sch-repeat')?.dataset.idx; if(idxAttr) tempSchedules[parseInt(idxAttr)].intervalDays = parseInt(inp.value)||1; }));
+        document.querySelectorAll('.remove-schedule').forEach(btn => btn.addEventListener('click', e => { let i = parseInt(btn.dataset.idx); tempSchedules.splice(i,1); renderScheduleInputs(); }));
+    }
+    function openMedModal(id=null) {
+        editingMedId = id;
+        document.getElementById("modalTitle").innerText = id ? "Редактировать" : "Добавить лекарство";
+        if(id !== null) {
+            const med = medications.find(m => m.id === id);
+            if(med) {
+                document.getElementById("medName").value = med.name;
+                let m = med.dosageStr?.match(/^([\d\.]+)\s+(.+)$/);
+                if(m) { document.getElementById("dosageValue").value = m[1]; document.getElementById("dosageUnit").value = m[2]; }
+                else { document.getElementById("dosageValue").value = ""; document.getElementById("dosageUnit").value = "мг"; }
+                tempSchedules = JSON.parse(JSON.stringify(med.schedules)); renderScheduleInputs();
+            }
+        } else {
+            document.getElementById("medName").value = ""; document.getElementById("dosageValue").value = ""; document.getElementById("dosageUnit").value = "мг";
+            tempSchedules = [{ time: "08:00", repeatType: "daily", intervalDays: 1, refDateISO: new Date().toISOString() }]; renderScheduleInputs();
+        }
+        document.getElementById("medModal").style.display = "flex";
+    }
+    function saveMedicineFromModal() {
+        let name = document.getElementById("medName").value.trim();
+        if(!name) { alert("Введите название"); return; }
+        let dosageVal = document.getElementById("dosageValue").value, dosageUnit = document.getElementById("dosageUnit").value;
+        let dosageStr = (dosageVal && dosageUnit) ? `${dosageVal} ${dosageUnit}` : "";
+        const schedules = [];
+        for(let s of tempSchedules) {
+            if(!s.time) continue;
+            let repeatType = s.repeatType || "daily";
+            let intervalDays = s.intervalDays;
+            if(repeatType === "daily") intervalDays = 1;
+            if(repeatType === "weekly") intervalDays = 7;
+            if(repeatType === "biweekly") intervalDays = 14;
+            if(repeatType === "triweekly") intervalDays = 21;
+            if(repeatType === "custom" && (!intervalDays || intervalDays<1)) intervalDays = 1;
+            schedules.push({ time: s.time, repeatType, intervalDays, refDateISO: s.refDateISO || new Date().toISOString() });
+        }
+        if(!schedules.length) { alert("Добавьте время"); return; }
+        if(editingMedId !== null) {
+            let idx = medications.findIndex(m => m.id === editingMedId);
+            if(idx !== -1) medications[idx] = { ...medications[idx], name, dosageStr, schedules };
+        } else medications.push({ id: Date.now(), name, dosageStr, schedules });
+        saveMeds(); closeMedModal(); renderMedicines(); renderTodayPanel(); renderCabinet(); renderSettings(); checkAndStartTodayReminders();
+    }
+    function closeMedModal() { document.getElementById("medModal").style.display = "none"; editingMedId = null; }
+
+    function openProfileModal() {
+        const m = document.getElementById("profileModal");
+        document.getElementById("profileName").value = profile.name || "";
+        document.getElementById("profileAge").value = profile.age || "";
+        document.getElementById("profileGender").value = profile.gender || "";
+        document.getElementById("profileHeight").value = profile.height || "";
+        document.getElementById("profileWeight").value = profile.weight || "";
+        m.style.display = "flex";
+    }
+    function saveProfileFromModal() {
+        profile.name = document.getElementById("profileName").value;
+        profile.age = document.getElementById("profileAge").value;
+        profile.gender = document.getElementById("profileGender").value;
+        profile.height = document.getElementById("profileHeight").value;
+        profile.weight = document.getElementById("profileWeight").value;
+        saveProfile(); renderCabinet(); renderSettings();
+        document.getElementById("profileModal").style.display = "none";
+    }
+    function resetRating() { if(confirm("Сбросить историю?")) { intakeHistory=[]; saveHistory(); renderTodayPanel(); renderCabinet(); renderSettings(); showNotif("История очищена"); } }
+    function resetAllData() { if(confirm("Полный сброс?")) { medications=[]; intakeHistory=[]; profile={name:"",age:"",gender:"",height:"",weight:""}; saveMeds(); saveHistory(); saveProfile(); for(let [k,iv] of activeReminders) clearInterval(iv); activeReminders.clear(); renderMedicines(); renderTodayPanel(); renderCabinet(); renderSettings(); showNotif("Все данные сброшены"); } }
+    function requestNotificationPermission() {
+        if(Notification.permission === "default") Notification.requestPermission().then(perm => { renderSettings(); if(perm === "granted") showNotif("Уведомления включены"); });
+        else if(Notification.permission === "denied") alert("Уведомления заблокированы");
+        else alert("Уведомления уже разрешены");
+    }
+
+    // Ripple эффект для кнопок
+    function addRipple(event) {
+        const button = event.currentTarget;
+        const ripple = document.createElement('span');
+        ripple.classList.add('ripple');
+        const rect = button.getBoundingClientRect();
+        const size = Math.max(rect.width, rect.height);
+        ripple.style.width = ripple.style.height = `${size}px`;
+        ripple.style.left = `${event.clientX - rect.left - size/2}px`;
+        ripple.style.top = `${event.clientY - rect.top - size/2}px`;
+        button.style.position = 'relative';
+        button.appendChild(ripple);
+        setTimeout(() => ripple.remove(), 400);
+    }
+    function attachRipples() {
+        document.querySelectorAll('.btn-primary, .btn-outline, .btn-danger').forEach(btn => {
+            btn.removeEventListener('click', addRipple);
+            btn.addEventListener('click', addRipple);
+        });
+    }
+
+    function initTheme() {
+        const saved = localStorage.getItem("tabtime_theme");
+        if(saved === "dark") document.body.classList.add("dark");
+        const toggle = document.getElementById("themeToggleBtn");
+        const update = () => toggle.innerHTML = document.body.classList.contains("dark") ? '<i class="fas fa-sun"></i>' : '<i class="fas fa-moon"></i>';
+        update();
+        toggle.onclick = () => {
+            document.body.classList.toggle("dark");
+            localStorage.setItem("tabtime_theme", document.body.classList.contains("dark") ? "dark" : "light");
+            update();
+        };
+    }
+    function setActivePanel(panelId) {
+        document.querySelectorAll('.panel').forEach(p => p.classList.remove('active-panel'));
+        document.getElementById(`${panelId}Panel`).classList.add('active-panel');
+        document.querySelectorAll('.nav-item').forEach(btn => btn.classList.remove('active'));
+        const activeBtn = Array.from(document.querySelectorAll('.nav-item')).find(b => b.dataset.panel === panelId);
+        if(activeBtn) activeBtn.classList.add('active');
+        if(panelId === 'today') renderTodayPanel();
+        if(panelId === 'cabinet') renderCabinet();
+        if(panelId === 'medicine') renderMedicines();
+        if(panelId === 'settings') renderSettings();
+        attachRipples();
+    }
+    function escapeHtml(str) { if(!str) return ''; return str.replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[m])); }
+
+    function init() {
+        loadData();
+        if(!profile.name) profile = { name: "", age: "", gender: "", height: "", weight: "" };
+        saveMeds(); saveProfile();
+        renderMedicines(); renderTodayPanel(); renderCabinet(); renderSettings();
+        startGlobalWatch();
+        setTimeout(() => { checkAndStartTodayReminders(); renderTodayPanel(); }, 800);
+        document.getElementById("addMedBtn").onclick = () => openMedModal(null);
+        document.getElementById("saveMedBtn").onclick = saveMedicineFromModal;
+        document.getElementById("closeModalBtn").onclick = closeMedModal;
+        document.getElementById("addScheduleBtn").onclick = () => { tempSchedules.push({ time: "12:00", repeatType: "daily", intervalDays: 1, refDateISO: new Date().toISOString() }); renderScheduleInputs(); };
+        document.getElementById("editProfileBtnSettings").onclick = openProfileModal;
+        document.getElementById("saveProfileBtn").onclick = saveProfileFromModal;
+        document.getElementById("closeProfileBtn").onclick = () => document.getElementById("profileModal").style.display = "none";
+        document.getElementById("requestNotifBtn").onclick = requestNotificationPermission;
+        document.getElementById("resetRatingBtn").onclick = resetRating;
+        document.getElementById("resetAllBtn").onclick = resetAllData;
+        document.querySelectorAll(".nav-item").forEach(btn => btn.addEventListener("click", () => setActivePanel(btn.dataset.panel)));
+        window.onclick = (e) => { if(e.target === document.getElementById("medModal")) closeMedModal(); if(e.target === document.getElementById("profileModal")) document.getElementById("profileModal").style.display = "none"; };
+        initTheme();
+        attachRipples();
+        if(Notification.permission === "default") setTimeout(()=>{},0);
+        renderSettings();
+    }
+    init();
+</script>
+</body>
+</html>
