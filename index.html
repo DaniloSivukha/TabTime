@@ -6,8 +6,10 @@
     <title>TabTime — умные напоминания о лекарствах</title>
     
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.0.0/css/all.min.css">
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E💊%3C/text%3E%3C/svg%3E">
+    <!-- Favicon заменён на логотип (путь указан) -->
+    <link rel="icon" href="img/Fav.ico" type="image/x-icon">
     <style>
+        /* ========== СТИЛИ (с анимациями из предыдущей версии) ========== */
         * {
             margin: 0;
             padding: 0;
@@ -29,7 +31,6 @@
             --success: #34c759;
             --shadow: 0 2px 8px rgba(0, 0, 0, 0.04), 0 4px 12px rgba(0, 0, 0, 0.06);
             --nav-bg: rgba(255,255,255,0.96);
-            --transition: all 0.25s cubic-bezier(0.2, 0.9, 0.4, 1.1);
         }
 
         body.dark {
@@ -51,6 +52,35 @@
             padding-bottom: 75px;
         }
 
+        /* Прелоадер */
+        .preloader {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--bg-page);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            transition: opacity 0.4s ease, visibility 0.4s;
+        }
+        .preloader img {
+            width: 180px;
+            height: auto;
+            animation: pulse 1.2s infinite ease-in-out;
+        }
+        @keyframes pulse {
+            0% { transform: scale(0.95); opacity: 0.7; }
+            50% { transform: scale(1.05); opacity: 1; }
+            100% { transform: scale(0.95); opacity: 0.7; }
+        }
+        .preloader.hide {
+            opacity: 0;
+            visibility: hidden;
+        }
+
         .app-container {
             max-width: 600px;
             margin: 0 auto;
@@ -58,29 +88,18 @@
             min-height: 100vh;
         }
 
-        /* ========== УЛУЧШЕННЫЕ АНИМАЦИИ ========== */
-        
-        /* Анимация появления панелей с зумом */
+        /* Анимации панелей и карточек */
         .panel {
             display: none;
             padding: 20px;
             animation: panelAppear 0.35s cubic-bezier(0.2, 0.9, 0.4, 1.1) forwards;
         }
         @keyframes panelAppear {
-            from {
-                opacity: 0;
-                transform: scale(0.98) translateY(8px);
-            }
-            to {
-                opacity: 1;
-                transform: scale(1) translateY(0);
-            }
+            from { opacity: 0; transform: scale(0.98) translateY(8px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
         }
-        .panel.active-panel {
-            display: block;
-        }
+        .panel.active-panel { display: block; }
 
-        /* Анимация появления карточек с каскадной задержкой */
         .card {
             background: var(--card-bg);
             border-radius: 24px;
@@ -94,26 +113,49 @@
         .card:nth-child(1) { animation-delay: 0.05s; }
         .card:nth-child(2) { animation-delay: 0.10s; }
         .card:nth-child(3) { animation-delay: 0.15s; }
-        .card:nth-child(4) { animation-delay: 0.20s; }
-        .card:nth-child(5) { animation-delay: 0.25s; }
         @keyframes cardFadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(12px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .card:active { transform: scale(0.99); box-shadow: 0 1px 4px rgba(0,0,0,0.05); }
+
+        /* Шапка с логотипом */
+        .header {
+            position: sticky;
+            top: 0;
+            background: var(--bg-page);
+            backdrop-filter: blur(12px);
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border);
+            z-index: 10;
+        }
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .logo img {
+            height: 54px;
+            width: auto;
+        }
+        .logo h1 {
+            font-size: 1.7rem;
+            font-weight: 600;
+            background: linear-gradient(135deg, var(--accent), #2c7cb6);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+        .logo span {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            font-weight: normal;
+            margin-left: 4px;
         }
 
-        /* Эффект при нажатии на карточку (микро-отклик) */
-        .card:active {
-            transform: scale(0.99);
-            box-shadow: 0 1px 4px rgba(0,0,0,0.05);
-        }
-
-        /* Кнопка темы с плавным вращением */
         .theme-toggle {
             background: var(--bg-surface);
             border: none;
@@ -124,12 +166,9 @@
             font-size: 1.2rem;
             transition: transform 0.3s cubic-bezier(0.34, 1.2, 0.64, 1), background 0.2s;
         }
-        .theme-toggle:active {
-            transform: rotate(25deg) scale(0.92);
-            background: var(--border);
-        }
+        .theme-toggle:active { transform: rotate(25deg) scale(0.92); background: var(--border); }
 
-        /* Нижнее меню с анимацией при наведении (активный пункт) */
+        /* Нижнее меню */
         .bottom-nav {
             position: fixed;
             bottom: 0;
@@ -159,84 +198,16 @@
             padding: 6px 12px;
             border-radius: 40px;
         }
-        .nav-item i {
-            font-size: 1.4rem;
-            transition: transform 0.2s ease, color 0.2s;
-        }
-        .nav-item:active i {
-            transform: scale(0.88);
-        }
-        .nav-item.active {
-            color: var(--accent);
-            background: var(--bg-surface);
-            transform: translateY(-2px);
-        }
-        .nav-item.active i {
-            transform: scale(1.05);
-        }
+        .nav-item i { font-size: 1.4rem; transition: transform 0.2s; }
+        .nav-item:active i { transform: scale(0.88); }
+        .nav-item.active { color: var(--accent); background: var(--bg-surface); transform: translateY(-2px); }
+        .nav-item.active i { transform: scale(1.05); }
 
-        /* Кнопки с ripple-эффектом (псевдоэлемент) */
-        .btn-primary, .btn-outline, .btn-danger {
-            position: relative;
-            overflow: hidden;
-            transition: transform 0.15s ease, background 0.2s, color 0.2s;
-        }
-        .btn-primary:active, .btn-outline:active, .btn-danger:active {
-            transform: scale(0.96);
-        }
-        /* ripple эффект при клике (динамически добавляется через JS, но базово: ) */
-        .ripple {
-            position: absolute;
-            border-radius: 50%;
-            background: rgba(255,255,255,0.5);
-            transform: scale(0);
-            animation: rippleAnim 0.4s linear;
-            pointer-events: none;
-        }
-        @keyframes rippleAnim {
-            to {
-                transform: scale(4);
-                opacity: 0;
-            }
-        }
-
-        /* Анимация для модальных окон */
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            background: rgba(0,0,0,0.5);
-            align-items: center;
-            justify-content: center;
-            z-index: 100;
-            backdrop-filter: blur(3px);
-        }
-        .modal-card {
-            background: var(--card-bg);
-            width: 90%;
-            max-width: 480px;
-            border-radius: 32px;
-            padding: 24px;
-            max-height: 85vh;
-            overflow-y: auto;
-            animation: modalPop 0.25s cubic-bezier(0.2, 0.9, 0.4, 1.2);
-        }
-        @keyframes modalPop {
-            from {
-                opacity: 0;
-                transform: scale(0.92);
-            }
-            to {
-                opacity: 1;
-                transform: scale(1);
-            }
-        }
-
-        /* Остальные стили без изменений (сохранены для краткости) */
-        .header { position: sticky; top: 0; background: var(--bg-page); backdrop-filter: blur(12px); padding: 14px 20px; display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid var(--border); z-index: 10; }
-        .logo h1 { font-size: 1.65rem; font-weight: 600; background: linear-gradient(135deg, var(--accent), #2c7cb6); -webkit-background-clip: text; background-clip: text; color: transparent; }
-        .logo span { font-size: 0.7rem; color: var(--text-secondary); font-weight: normal; }
+        /* Кнопки и прочие элементы */
+        .btn-primary, .btn-outline, .btn-danger { position: relative; overflow: hidden; transition: transform 0.15s ease, background 0.2s; }
+        .btn-primary:active, .btn-outline:active, .btn-danger:active { transform: scale(0.96); }
+        .ripple { position: absolute; border-radius: 50%; background: rgba(255,255,255,0.5); transform: scale(0); animation: rippleAnim 0.4s linear; pointer-events: none; }
+        @keyframes rippleAnim { to { transform: scale(4); opacity: 0; } }
         .btn-primary { background: var(--accent); border: none; color: white; padding: 10px 16px; border-radius: 40px; font-weight: 500; width: 100%; font-size: 1rem; cursor: pointer; margin-top: 8px; }
         .btn-outline { background: transparent; border: 1px solid var(--accent); color: var(--accent); border-radius: 40px; padding: 8px 14px; cursor: pointer; }
         .btn-danger { background: transparent; border: 1px solid var(--danger); color: var(--danger); border-radius: 40px; padding: 8px 14px; cursor: pointer; }
@@ -247,46 +218,57 @@
         .status-taken { background: var(--success); color: #fff; }
         .status-missed { background: var(--danger); color: #fff; }
         .status-pending { background: var(--warning); color: #1e1e1e; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; z-index: 100; backdrop-filter: blur(3px); }
+        .modal-card { background: var(--card-bg); width: 90%; max-width: 480px; border-radius: 32px; padding: 24px; max-height: 85vh; overflow-y: auto; animation: modalPop 0.25s cubic-bezier(0.2, 0.9, 0.4, 1.2); }
+        @keyframes modalPop { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: scale(1); } }
         .modal-card input, .modal-card select { width: 100%; padding: 12px; margin: 8px 0; border-radius: 16px; border: 1px solid var(--border); background: var(--bg-surface); color: var(--text-primary); font-family: inherit; }
         .dosage-group { display: flex; gap: 8px; align-items: center; }
-        .dosage-group input { flex: 2; margin: 0; }
-        .dosage-group select { flex: 1; margin: 0; }
         .schedule-group { background: var(--bg-surface); border-radius: 20px; padding: 12px; margin-bottom: 16px; border: 1px solid var(--border); }
         .schedule-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
-        .schedule-row select, .schedule-row input { flex: 1; margin: 0; }
         .remove-schedule { background: none; border: none; color: var(--danger); font-size: 1.2rem; cursor: pointer; }
         .empty-state { text-align: center; color: var(--text-secondary); padding: 40px; }
         .settings-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
         .text-secondary { color: var(--text-secondary); font-size: 0.85rem; }
         .double-progress { background: var(--bg-surface); border-radius: 20px; height: 12px; overflow: hidden; display: flex; margin: 12px 0; }
-        .progress-taken { background: var(--success); height: 100%; width: 0%; transition: width 0.5s ease-out; }
-        .progress-missed { background: var(--danger); height: 100%; width: 0%; transition: width 0.5s ease-out; }
+        .progress-taken { background: var(--success); width: 0%; transition: width 0.5s ease-out; }
+        .progress-missed { background: var(--danger); width: 0%; transition: width 0.5s ease-out; }
         .profile-header { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
-        .profile-avatar { width: 70px; height: 70px; background: var(--accent); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 2rem; color: white; box-shadow: 0 4px 12px rgba(0,0,0,0.1); transition: transform 0.2s; }
-        .profile-avatar:active { transform: scale(0.96); }
+        .profile-avatar { width: 70px; height: 70px; background: var(--accent); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 2rem; color: white; }
         .profile-name { font-size: 1.3rem; font-weight: 600; }
         .profile-bio { font-size: 0.8rem; color: var(--text-secondary); margin-top: 4px; }
         .stats-grid { display: flex; justify-content: space-between; margin-top: 16px; gap: 12px; }
-        .stat-card { background: var(--bg-surface); border-radius: 20px; padding: 12px; text-align: center; flex: 1; transition: transform 0.2s; }
-        .stat-card:active { transform: scale(0.97); }
+        .stat-card { background: var(--bg-surface); border-radius: 20px; padding: 12px; text-align: center; flex: 1; }
         .stat-number { font-size: 1.6rem; font-weight: 700; }
         .profile-row { display: flex; justify-content: space-between; margin: 12px 0; }
+        .social-links { display: flex; gap: 16px; margin-top: 12px; justify-content: center; }
+        .social-link { color: var(--accent); text-decoration: none; font-size: 1rem; transition: transform 0.2s; display: inline-flex; align-items: center; gap: 8px; }
+        .social-link:hover { transform: scale(1.05); }
     </style>
 </head>
 <body>
+
+<!-- Прелоадер (будет скрыт через 1.5 секунды) -->
+<div class="preloader" id="preloader">
+    <img src="img/logo.png" alt="TabTime">
+</div>
+
 <div class="app-container">
     <div class="header">
         <div class="logo">
-            <h1>TabTime <span>v02.26.04</span></h1>
+            <img src="img/logo.png" alt="TabTime">
+            <h1>TabTime <span>v03.26.04</span></h1>
         </div>
         <button class="theme-toggle" id="themeToggleBtn"><i class="fas fa-moon"></i></button>
     </div>
 
-    <!-- Статистика -->
+    <!-- Панель Статистика (с ИМТ и соцсетями) -->
     <div id="cabinetPanel" class="panel">
         <div class="card">
             <div class="profile-header" id="profileHeader"></div>
-            <h3><i class="fas fa-chart-line"></i> Общая статистика</h3>
+            <div id="bmiDisplay" style="margin-top: 8px; font-size: 0.9rem; background: var(--bg-surface); padding: 8px 12px; border-radius: 20px; display: inline-block;">
+                <i class="fas fa-calculator"></i> ИМТ: <span id="bmiValue">—</span>
+            </div>
+            <h3 style="margin-top: 12px;"><i class="fas fa-chart-line"></i> Общая статистика</h3>
             <div class="double-progress">
                 <div class="progress-taken" id="progressTakenFill"></div>
                 <div class="progress-missed" id="progressMissedFill"></div>
@@ -296,11 +278,20 @@
                 <div class="stat-card"><div class="stat-number" id="missedCount">0</div><div><i class="fas fa-times-circle"></i> Пропущено</div></div>
                 <div class="stat-card"><div class="stat-number" id="totalCount">0</div><div><i class="fas fa-chart-simple"></i> Всего</div></div>
             </div>
-            <div style="margin-top: 12px; text-align: center; font-size: 0.85rem;" id="ratingPercentText">0% выполнено</div>
+            <div style="margin-top: 12px; text-align: center;" id="ratingPercentText">0% выполнено</div>
         </div>
         <div class="card">
-            <h3><i class="fas fa-info-circle"></i> О приложении</h3>
-            <p>Напоминания повторяются <strong>7 минут</strong> (каждые 2 минуты), затем просрочка с уведомлением. Данные локально.</p>
+            <h3><i class="fas fa-info-circle"></i> О программе</h3>
+            <p><strong>Версия:</strong> v03.26.04</p>
+            <p><strong>Разработчик:</strong> DaniloSivukha</p>
+            <p>Напоминания повторяются 7 минут (каждые 2 минуты), затем просрочка. Данные хранятся локально.</p>
+            <div class="social-links">
+                <a href="https://t.me/TabTimeApp" target="_blank" class="social-link"><i class="fab fa-telegram"></i> t.me/TabTimeApp</a>
+            </div>
+        </div>
+        <div class="card">
+            <h3><i class="fas fa-comment"></i> Обратная связь</h3>
+            <p>Предложения и ошибки: <a href="mailto:tabtime.support@gmail.com" style="color:var(--accent);">tabtime.support@gmail.com</a><br>Или в Telegram: <a href="https://t.me/TabTimeApp" style="color:var(--accent);">@TabTimeApp</a></p>
         </div>
     </div>
 
@@ -355,12 +346,12 @@
     </div>
 </div>
 
-<!-- Модальные окна -->
-<div id="medModal" class="modal"><div class="modal-card"><h3 id="modalTitle">Добавить лекарство</h3><input type="text" id="medName" placeholder="Название"><div class="dosage-group"><input type="number" id="dosageValue" placeholder="Количество" step="any"><select id="dosageUnit"><option value="мг">мг</option><option value="мл">мл</option><option value="таб.">таб.</option><option value="капли">капли</option><option value="ложки">ложки</option><option value="шт.">шт.</option></select></div><div id="schedulesContainer"></div><button id="addScheduleBtn" class="btn-outline" style="margin: 10px 0;"><i class="fas fa-plus-circle"></i> Добавить время</button><div style="display: flex; gap: 12px; margin-top: 16px;"><button id="saveMedBtn" class="btn-primary">Сохранить</button><button id="closeModalBtn" class="btn-outline">Отмена</button></div></div></div>
+<!-- Модалки (лекарство и профиль) -->
+<div id="medModal" class="modal"><div class="modal-card"><h3 id="modalTitle">Добавить лекарство</h3><input type="text" id="medName" placeholder="Название"><div class="dosage-group"><input type="number" id="dosageValue" placeholder="Количество" step="any"><select id="dosageUnit"><option value="мг">мг</option><option value="мл">мл</option><option value="таб.">таб.</option><option value="капли">капли</option><option value="ложки">ложки</option><option value="шт.">шт.</option></select></div><div id="schedulesContainer"></div><button id="addScheduleBtn" class="btn-outline" style="margin:10px 0"><i class="fas fa-plus-circle"></i> Добавить время</button><div style="display: flex; gap: 12px; margin-top: 16px;"><button id="saveMedBtn" class="btn-primary">Сохранить</button><button id="closeModalBtn" class="btn-outline">Отмена</button></div></div></div>
 <div id="profileModal" class="modal"><div class="modal-card"><h3>Редактировать профиль</h3><input type="text" id="profileName" placeholder="Имя"><input type="number" id="profileAge" placeholder="Возраст"><select id="profileGender"><option value="">Пол</option><option>Мужской</option><option>Женский</option></select><input type="number" id="profileHeight" placeholder="Рост (см)"><input type="number" id="profileWeight" placeholder="Вес (кг)"><div style="display: flex; gap: 12px; margin-top: 16px;"><button id="saveProfileBtn" class="btn-primary">Сохранить</button><button id="closeProfileBtn" class="btn-outline">Закрыть</button></div></div></div>
 
 <script>
-    // ---------- ДАННЫЕ ---------- (полностью сохранены, добавлен ripple эффект для кнопок)
+    // ========== ДАННЫЕ И ЛОГИКА ==========
     let medications = [];
     let intakeHistory = [];
     let profile = { name: "", age: "", gender: "", height: "", weight: "" };
@@ -382,8 +373,10 @@
         if (repeatType === "custom" && intervalDays > 0) return diffDays % intervalDays === 0;
         return false;
     }
+
     function formatDosage(val, unit) { return (val && unit) ? `${val} ${unit}` : ""; }
 
+    // Загрузка/сохранение
     function loadData() {
         const m = localStorage.getItem("tabtime_medications");
         if(m) medications = JSON.parse(m);
@@ -399,6 +392,7 @@
     function saveHistory() { localStorage.setItem("tabtime_history", JSON.stringify(intakeHistory)); }
     function saveProfile() { localStorage.setItem("tabtime_profile", JSON.stringify(profile)); }
 
+    // Получение статуса
     function getIntakeStatus(medId, schedIdx, dateStr) {
         return intakeHistory.find(e => e.medId === medId && e.scheduleIdx === schedIdx && e.dateStr === dateStr);
     }
@@ -410,15 +404,34 @@
         stopReminder(medId, schedIdx, dateStr);
         if(status === "missed") {
             const med = medications.find(m => m.id === medId);
-            if(med) showNotif(`Просрочка! ${med.name} (${timeStr}) не принят.`);
+            if(med) showNotification(`Просрочка! ${med.name} (${timeStr}) не принят.`);
         }
         renderTodayPanel(); renderCabinet(); renderSettings();
     }
+
     function stopReminder(medId, schedIdx, dateStr) {
         const key = `${medId}_${schedIdx}_${dateStr}`;
         if(activeReminders.has(key)) { clearInterval(activeReminders.get(key)); activeReminders.delete(key); }
     }
-    function showNotif(body) { if (Notification.permission === "granted") new Notification("TabTime", { body }); }
+
+    // ИСПРАВЛЕННАЯ ФУНКЦИЯ УВЕДОМЛЕНИЙ
+    function showNotification(body) {
+        if (!("Notification" in window)) {
+            console.warn("Браузер не поддерживает уведомления");
+            return;
+        }
+        if (Notification.permission === "granted") {
+            try {
+                new Notification("TabTime", { body, icon: 'img/logo.png' });
+            } catch (e) {
+                console.error("Ошибка показа уведомления:", e);
+            }
+        } else if (Notification.permission === "default") {
+            console.log("Разрешение на уведомления ещё не запрошено");
+        } else {
+            console.log("Уведомления запрещены пользователем");
+        }
+    }
 
     function startReminderNotification(med, schedIdx, schedule, dateStr) {
         const key = `${med.id}_${schedIdx}_${dateStr}`;
@@ -439,11 +452,11 @@
                 renderTodayPanel();
                 return;
             }
-            showNotif(`Напоминание: примите ${med.name} ${med.dosageStr ? `(${med.dosageStr})` : ''} в ${timeStr}`);
+            showNotification(`Напоминание: примите ${med.name} ${med.dosageStr ? `(${med.dosageStr})` : ''} в ${timeStr}`);
             renderTodayPanel();
         }, REMINDER_INTERVAL_MS);
         activeReminders.set(key, intervalId);
-        if(new Date() >= scheduleTime) showNotif(`Напоминание: примите ${med.name} в ${timeStr}`);
+        if(new Date() >= scheduleTime) showNotification(`Напоминание: примите ${med.name} в ${timeStr}`);
     }
 
     function getTodaySchedules() {
@@ -500,7 +513,18 @@
         }, 30000);
     }
 
-    // ========== UI RENDER (c сохранением всей логики) ==========
+    // Расчёт ИМТ
+    function calculateBMI() {
+        const height = parseFloat(profile.height);
+        const weight = parseFloat(profile.weight);
+        if (height && weight && height > 0) {
+            const bmi = weight / ((height/100) ** 2);
+            return bmi.toFixed(1);
+        }
+        return null;
+    }
+
+    // ========== UI ОТРИСОВКА ==========
     function renderMedicines() {
         const container = document.getElementById("medicinesList");
         if(!medications.length) { container.innerHTML = `<div class="empty-state"><i class="fas fa-capsules"></i><p>Добавьте лекарство</p></div>`; return; }
@@ -544,7 +568,7 @@
         document.querySelectorAll('.takeBtn').forEach(btn => btn.addEventListener('click', () => {
             const medId = parseInt(btn.dataset.medid), idx = parseInt(btn.dataset.schedidx), time = btn.dataset.time;
             setIntakeStatus(medId, idx, todayStr(), time, "taken");
-            showNotif("Приём подтверждён!");
+            showNotification("Приём подтверждён!");
             renderTodayPanel(); renderCabinet(); renderSettings();
         }));
     }
@@ -552,6 +576,18 @@
     function renderCabinet() {
         const ph = document.getElementById("profileHeader");
         ph.innerHTML = `<div class="profile-avatar"><i class="fas fa-user"></i></div><div class="profile-details"><div class="profile-name">${escapeHtml(profile.name || 'Гость')}</div><div class="profile-bio">${profile.age ? profile.age+' лет' : ''} ${profile.gender ? `· ${profile.gender}` : ''}<br>${profile.height ? 'Рост '+profile.height+' см' : ''} ${profile.weight ? 'Вес '+profile.weight+' кг' : ''}</div></div>`;
+        const bmi = calculateBMI();
+        const bmiSpan = document.getElementById("bmiValue");
+        if(bmi) {
+            let category = "";
+            if (bmi < 18.5) category = " (недостаток)";
+            else if (bmi < 25) category = " (норма)";
+            else if (bmi < 30) category = " (избыток)";
+            else category = " (ожирение)";
+            bmiSpan.innerText = `${bmi}${category}`;
+        } else {
+            bmiSpan.innerText = "— (заполните рост/вес)";
+        }
         let taken = 0, missed = 0;
         intakeHistory.forEach(rec => { if(rec.status === "taken") taken++; else if(rec.status === "missed") missed++; });
         const total = taken + missed;
@@ -588,6 +624,7 @@
         }
     }
 
+    // Модалки (лекарства)
     let editingMedId = null, tempSchedules = [];
     function renderScheduleInputs() {
         const cont = document.getElementById("schedulesContainer");
@@ -644,10 +681,12 @@
             let idx = medications.findIndex(m => m.id === editingMedId);
             if(idx !== -1) medications[idx] = { ...medications[idx], name, dosageStr, schedules };
         } else medications.push({ id: Date.now(), name, dosageStr, schedules });
-        saveMeds(); closeMedModal(); renderMedicines(); renderTodayPanel(); renderCabinet(); renderSettings(); checkAndStartTodayReminders();
+        saveMeds(); closeMedModal(); renderMedicines(); renderTodayPanel(); renderCabinet(); renderSettings();
+        checkAndStartTodayReminders();
     }
     function closeMedModal() { document.getElementById("medModal").style.display = "none"; editingMedId = null; }
 
+    // Профиль
     function openProfileModal() {
         const m = document.getElementById("profileModal");
         document.getElementById("profileName").value = profile.name || "";
@@ -666,46 +705,40 @@
         saveProfile(); renderCabinet(); renderSettings();
         document.getElementById("profileModal").style.display = "none";
     }
-    function resetRating() { if(confirm("Сбросить историю?")) { intakeHistory=[]; saveHistory(); renderTodayPanel(); renderCabinet(); renderSettings(); showNotif("История очищена"); } }
-    function resetAllData() { if(confirm("Полный сброс?")) { medications=[]; intakeHistory=[]; profile={name:"",age:"",gender:"",height:"",weight:""}; saveMeds(); saveHistory(); saveProfile(); for(let [k,iv] of activeReminders) clearInterval(iv); activeReminders.clear(); renderMedicines(); renderTodayPanel(); renderCabinet(); renderSettings(); showNotif("Все данные сброшены"); } }
+
+    // Сброс данных
+    function resetRating() { if(confirm("Сбросить историю?")) { intakeHistory=[]; saveHistory(); renderTodayPanel(); renderCabinet(); renderSettings(); showNotification("История очищена"); } }
+    function resetAllData() { if(confirm("Полный сброс?")) { medications=[]; intakeHistory=[]; profile={name:"",age:"",gender:"",height:"",weight:""}; saveMeds(); saveHistory(); saveProfile(); for(let [k,iv] of activeReminders) clearInterval(iv); activeReminders.clear(); renderMedicines(); renderTodayPanel(); renderCabinet(); renderSettings(); showNotification("Все данные сброшены"); } }
     function requestNotificationPermission() {
-        if(Notification.permission === "default") Notification.requestPermission().then(perm => { renderSettings(); if(perm === "granted") showNotif("Уведомления включены"); });
-        else if(Notification.permission === "denied") alert("Уведомления заблокированы");
-        else alert("Уведомления уже разрешены");
+        if (!("Notification" in window)) {
+            alert("Ваш браузер не поддерживает уведомления");
+            return;
+        }
+        if (Notification.permission === "default") {
+            Notification.requestPermission().then(perm => {
+                renderSettings();
+                if (perm === "granted") {
+                    showNotification("Уведомления включены! Теперь вы будете получать напоминания.");
+                } else if (perm === "denied") {
+                    alert("Вы запретили уведомления. Чтобы их включить, измените настройки браузера для этого сайта.");
+                }
+            });
+        } else if (Notification.permission === "denied") {
+            alert("Уведомления заблокированы. Пожалуйста, разрешите их в настройках браузера.");
+        } else {
+            alert("Уведомления уже разрешены");
+            showNotification("Тестовое уведомление работает!");
+        }
     }
 
-    // Ripple эффект для кнопок
-    function addRipple(event) {
-        const button = event.currentTarget;
-        const ripple = document.createElement('span');
-        ripple.classList.add('ripple');
-        const rect = button.getBoundingClientRect();
-        const size = Math.max(rect.width, rect.height);
-        ripple.style.width = ripple.style.height = `${size}px`;
-        ripple.style.left = `${event.clientX - rect.left - size/2}px`;
-        ripple.style.top = `${event.clientY - rect.top - size/2}px`;
-        button.style.position = 'relative';
-        button.appendChild(ripple);
-        setTimeout(() => ripple.remove(), 400);
-    }
-    function attachRipples() {
-        document.querySelectorAll('.btn-primary, .btn-outline, .btn-danger').forEach(btn => {
-            btn.removeEventListener('click', addRipple);
-            btn.addEventListener('click', addRipple);
-        });
-    }
-
+    // Тема и навигация
     function initTheme() {
         const saved = localStorage.getItem("tabtime_theme");
         if(saved === "dark") document.body.classList.add("dark");
         const toggle = document.getElementById("themeToggleBtn");
         const update = () => toggle.innerHTML = document.body.classList.contains("dark") ? '<i class="fas fa-sun"></i>' : '<i class="fas fa-moon"></i>';
         update();
-        toggle.onclick = () => {
-            document.body.classList.toggle("dark");
-            localStorage.setItem("tabtime_theme", document.body.classList.contains("dark") ? "dark" : "light");
-            update();
-        };
+        toggle.onclick = () => { document.body.classList.toggle("dark"); localStorage.setItem("tabtime_theme", document.body.classList.contains("dark") ? "dark" : "light"); update(); };
     }
     function setActivePanel(panelId) {
         document.querySelectorAll('.panel').forEach(p => p.classList.remove('active-panel'));
@@ -719,8 +752,28 @@
         if(panelId === 'settings') renderSettings();
         attachRipples();
     }
+    function attachRipples() {
+        document.querySelectorAll('.btn-primary, .btn-outline, .btn-danger').forEach(btn => {
+            btn.removeEventListener('click', addRipple);
+            btn.addEventListener('click', addRipple);
+        });
+    }
+    function addRipple(e) {
+        const btn = e.currentTarget;
+        const ripple = document.createElement('span');
+        ripple.classList.add('ripple');
+        const rect = btn.getBoundingClientRect();
+        const size = Math.max(rect.width, rect.height);
+        ripple.style.width = ripple.style.height = `${size}px`;
+        ripple.style.left = `${e.clientX - rect.left - size/2}px`;
+        ripple.style.top = `${e.clientY - rect.top - size/2}px`;
+        btn.style.position = 'relative';
+        btn.appendChild(ripple);
+        setTimeout(() => ripple.remove(), 400);
+    }
     function escapeHtml(str) { if(!str) return ''; return str.replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[m])); }
 
+    // Инициализация со скрытием прелоадера через 1.5 секунды
     function init() {
         loadData();
         if(!profile.name) profile = { name: "", age: "", gender: "", height: "", weight: "" };
@@ -744,6 +797,9 @@
         attachRipples();
         if(Notification.permission === "default") setTimeout(()=>{},0);
         renderSettings();
+        // Прелоадер 1.5 сек
+        const preloader = document.getElementById('preloader');
+        setTimeout(() => preloader.classList.add('hide'), 1500);
     }
     init();
 </script>
