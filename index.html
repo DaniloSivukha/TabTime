@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
     <title>TabTime — умные напоминания о лекарствах</title>
     
-    <!-- PWA манифест (исправлен) -->
+    <!-- PWA манифест (валидный) -->
     <link rel="manifest" href="data:application/manifest+json,{
         %22name%22:%22TabTime%22,
         %22short_name%22:%22TabTime%22,
@@ -27,6 +27,7 @@
     <link rel="icon" href="img/Fav.ico" type="image/x-icon">
     
     <style>
+        /* ========== ВСЕ СТИЛИ (без изменений) ========== */
         * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         :root { --bg-page: #ffffff; --bg-surface: #f0f2f5; --card-bg: #ffffff; --text-primary: #0a0a0a; --text-secondary: #5e5e5e; --accent: #40a7e3; --accent-dark: #2e8ec0; --border: #e0e0e0; --danger: #e64646; --warning: #ffb443; --success: #34c759; --shadow: 0 2px 8px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.06); --nav-bg: rgba(255,255,255,0.96); }
         body.dark { --bg-page: #0f0f0f; --bg-surface: #1c1c1e; --card-bg: #252528; --text-primary: #f0f0f0; --text-secondary: #a0a0a0; --border: #2c2c2e; --shadow: 0 2px 8px rgba(0,0,0,0.3); --nav-bg: rgba(28,28,30,0.96); }
@@ -175,7 +176,7 @@
                 <button id="testNotifBtn" class="btn-outline">Проверить</button>
             </div>
             <p class="text-secondary">Статус разрешения: <span id="notifStatus">неизвестно</span></p>
-            <p class="text-secondary" style="font-size: 0.7rem;">* Для надёжной работы уведомлений установите приложение на главный экран.</p>
+            <p class="text-secondary" style="font-size: 0.7rem;">* Для стабильной работы уведомлений приложение должно быть добавлено на главный экран (PWA). На iOS также должен быть активен экран.</p>
         </div>
         <div class="card">
             <h3><i class="fas fa-database"></i> Данные</h3>
@@ -202,7 +203,7 @@
 <div id="profileModal" class="modal"><div class="modal-card"><h3>Редактировать профиль</h3><input type="text" id="profileName" placeholder="Имя"><input type="number" id="profileAge" placeholder="Возраст"><select id="profileGender"><option value="">Пол</option><option>Мужской</option><option>Женский</option></select><input type="number" id="profileHeight" placeholder="Рост (см)"><input type="number" id="profileWeight" placeholder="Вес (кг)"><div style="display: flex; gap: 12px; margin-top: 16px;"><button id="saveProfileBtn" class="btn-primary">Сохранить</button><button id="closeProfileBtn" class="btn-outline">Закрыть</button></div></div></div>
 
 <script>
-    // ========== ОСНОВНАЯ ЛОГИКА (БЕЗ SERVICE WORKER) ==========
+    // ========== ОСНОВНАЯ ЛОГИКА (без Service Worker) ==========
     let medications = [];
     let intakeHistory = [];
     let profile = { name: "", age: "", gender: "", height: "", weight: "" };
@@ -261,7 +262,7 @@
         if(activeReminders.has(key)) { clearInterval(activeReminders.get(key)); activeReminders.delete(key); }
     }
 
-    // ПРОСТАЯ ФУНКЦИЯ УВЕДОМЛЕНИЙ (working everywhere)
+    // ПРОСТАЯ ФУНКЦИЯ УВЕДОМЛЕНИЙ (работает везде, где разрешено)
     function showNotification(body) {
         if (!("Notification" in window)) return false;
         if (Notification.permission !== "granted") return false;
@@ -361,7 +362,7 @@
         return null;
     }
 
-    // UI Render (сокращён, но полностью рабочий)
+    // UI Render
     function renderMedicines() {
         const container = document.getElementById("medicinesList");
         if(!medications.length) { container.innerHTML = `<div class="empty-state"><i class="fas fa-capsules"></i><p>Добавьте лекарство</p></div>`; return; }
@@ -540,6 +541,7 @@
 
     function resetRating() { if(confirm("Сбросить историю?")) { intakeHistory=[]; saveHistory(); renderTodayPanel(); renderCabinet(); renderSettings(); showNotification("История очищена"); } }
     function resetAllData() { if(confirm("Полный сброс?")) { medications=[]; intakeHistory=[]; profile={name:"",age:"",gender:"",height:"",weight:""}; saveMeds(); saveHistory(); saveProfile(); for(let [k,iv] of activeReminders) clearInterval(iv); activeReminders.clear(); renderMedicines(); renderTodayPanel(); renderCabinet(); renderSettings(); showNotification("Все данные сброшены"); } }
+
     async function requestNotificationPermission() {
         if (!("Notification" in window)) { alert("Ваш браузер не поддерживает уведомления"); return; }
         if (Notification.permission === "default") {
@@ -557,13 +559,14 @@
             showNotification("Тестовое уведомление работает!");
         }
     }
+
     async function testNotification() {
         if (Notification.permission !== "granted") {
             alert("Сначала разрешите уведомления через кнопку 'Запросить'");
             return;
         }
         const success = showNotification("✅ Тестовое уведомление! Если вы это видите, всё работает.");
-        alert("Тестовое уведомление отправлено. Проверьте, пришло ли оно.");
+        alert("Тестовое уведомление отправлено. Пожалуйста, проверьте, пришло ли оно (если приложение добавлено на главный экран, проверьте уведомления в системе).");
     }
 
     function initTheme() {
