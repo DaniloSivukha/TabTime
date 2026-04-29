@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
     <title>TabTime — умные напоминания о лекарствах</title>
     
-    <!-- PWA манифест (динамически создаётся) -->
+    <!-- PWA манифест (динамический) + метатеги -->
     <link rel="manifest" id="manifestLink">
     <meta name="theme-color" content="#40a7e3">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -16,7 +16,7 @@
     <link rel="icon" href="img/Fav.ico" type="image/x-icon">
     
     <style>
-        /* ========== ВСЕ СТИЛИ (без изменений — они уже отличные) ========== */
+        /* ========== СТИЛИ (полностью сохранены, без изменений) ========== */
         * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         :root { --bg-page: #ffffff; --bg-surface: #f0f2f5; --card-bg: #ffffff; --text-primary: #0a0a0a; --text-secondary: #5e5e5e; --accent: #40a7e3; --accent-dark: #2e8ec0; --border: #e0e0e0; --danger: #e64646; --warning: #ffb443; --success: #34c759; --shadow: 0 2px 8px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.06); --nav-bg: rgba(255,255,255,0.96); }
         body.dark { --bg-page: #0f0f0f; --bg-surface: #1c1c1e; --card-bg: #252528; --text-primary: #f0f0f0; --text-secondary: #a0a0a0; --border: #2c2c2e; --shadow: 0 2px 8px rgba(0,0,0,0.3); --nav-bg: rgba(28,28,30,0.96); }
@@ -102,7 +102,6 @@
         <button class="theme-toggle" id="themeToggleBtn"><i class="fas fa-moon"></i></button>
     </div>
 
-    <!-- Статистика -->
     <div id="cabinetPanel" class="panel">
         <div class="card">
             <div class="profile-header" id="profileHeader"></div>
@@ -136,7 +135,6 @@
         </div>
     </div>
 
-    <!-- Аптечка -->
     <div id="medicinePanel" class="panel active-panel">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
             <h2><i class="fas fa-kit-medical"></i> Моя аптечка</h2>
@@ -145,13 +143,11 @@
         <div id="medicinesList"></div>
     </div>
 
-    <!-- Сегодня -->
     <div id="todayPanel" class="panel">
         <h2 style="margin-bottom: 12px;"><i class="fas fa-bell"></i> Сегодняшний приём</h2>
         <div id="todayReminders"></div>
     </div>
 
-    <!-- Настройки -->
     <div id="settingsPanel" class="panel">
         <div class="card">
             <h3><i class="fas fa-user-edit"></i> Профиль</h3>
@@ -168,7 +164,12 @@
                 <span><i class="fas fa-vial"></i> Тест уведомления</span>
                 <button id="testNotifBtn" class="btn-outline">Проверить</button>
             </div>
-            <p class="text-secondary">Статус: <span id="notifStatus">неизвестно</span></p>
+            <div class="settings-item">
+                <span><i class="fab fa-chrome"></i> Статус Service Worker</span>
+                <span id="swStatus">не проверено</span>
+            </div>
+            <p class="text-secondary">Статус разрешения: <span id="notifStatus">неизвестно</span></p>
+            <p class="text-secondary" style="font-size: 0.7rem;">* Для работы уведомлений приложение должно быть установлено на главный экран (PWA). На iOS также нужен активный экран.</p>
         </div>
         <div class="card">
             <h3><i class="fas fa-database"></i> Данные</h3>
@@ -191,15 +192,14 @@
     </div>
 </div>
 
-<!-- Модалки -->
 <div id="medModal" class="modal"><div class="modal-card"><h3 id="modalTitle">Добавить лекарство</h3><input type="text" id="medName" placeholder="Название"><div class="dosage-group"><input type="number" id="dosageValue" placeholder="Количество" step="any"><select id="dosageUnit"><option value="мг">мг</option><option value="мл">мл</option><option value="таб.">таб.</option><option value="капли">капли</option><option value="ложки">ложки</option><option value="шт.">шт.</option></select></div><div id="schedulesContainer"></div><button id="addScheduleBtn" class="btn-outline" style="margin:10px 0"><i class="fas fa-plus-circle"></i> Добавить время</button><div style="display: flex; gap: 12px; margin-top: 16px;"><button id="saveMedBtn" class="btn-primary">Сохранить</button><button id="closeModalBtn" class="btn-outline">Отмена</button></div></div></div>
 <div id="profileModal" class="modal"><div class="modal-card"><h3>Редактировать профиль</h3><input type="text" id="profileName" placeholder="Имя"><input type="number" id="profileAge" placeholder="Возраст"><select id="profileGender"><option value="">Пол</option><option>Мужской</option><option>Женский</option></select><input type="number" id="profileHeight" placeholder="Рост (см)"><input type="number" id="profileWeight" placeholder="Вес (кг)"><div style="display: flex; gap: 12px; margin-top: 16px;"><button id="saveProfileBtn" class="btn-primary">Сохранить</button><button id="closeProfileBtn" class="btn-outline">Закрыть</button></div></div></div>
 
 <script>
-    // ========== PWA: ДИНАМИЧЕСКОЕ СОЗДАНИЕ МАНИФЕСТА И SERVICE WORKER ==========
-    (function createPWA() {
-        // 1. Создаём манифест
-        const manifestObj = {
+    // ========== PWA: СОЗДАНИЕ МАНИФЕСТА И SERVICE WORKER (улучшенный) ==========
+    (function setupPWA() {
+        // 1. Манифест
+        const manifest = {
             name: "TabTime",
             short_name: "TabTime",
             description: "Умные напоминания о приёме лекарств",
@@ -212,24 +212,17 @@
                 { src: "img/logo.png", sizes: "512x512", type: "image/png", purpose: "any maskable" }
             ]
         };
-        const manifestBlob = new Blob([JSON.stringify(manifestObj)], { type: "application/manifest+json" });
+        const manifestBlob = new Blob([JSON.stringify(manifest)], { type: "application/manifest+json" });
         const manifestURL = URL.createObjectURL(manifestBlob);
         document.getElementById("manifestLink").href = manifestURL;
 
-        // 2. Создаём Service Worker с обработкой fetch (для PWA-установки)
+        // 2. Service Worker (с поддержкой показа уведомлений)
         const swCode = `
-            const CACHE_NAME = 'tabtime-pwa-v1';
             self.addEventListener('install', event => {
                 self.skipWaiting();
             });
             self.addEventListener('activate', event => {
                 event.waitUntil(clients.claim());
-            });
-            self.addEventListener('fetch', event => {
-                // Простая стратегия: сначала сеть, при ошибке - кэш (необязательно)
-                event.respondWith(
-                    fetch(event.request).catch(() => caches.match(event.request))
-                );
             });
             self.addEventListener('notificationclick', event => {
                 event.notification.close();
@@ -240,15 +233,24 @@
         const swURL = URL.createObjectURL(swBlob);
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register(swURL).then(reg => {
-                console.log('Service Worker зарегистрирован для PWA');
-                // Не отзываем URL сразу, чтобы SW успел установиться
+                console.log('[PWA] Service Worker registered');
+                // Обновляем статус в интерфейсе
+                const swSpan = document.getElementById('swStatus');
+                if (swSpan) swSpan.innerText = 'активен ✅';
+                // Отложенный отзыв URL
                 setTimeout(() => URL.revokeObjectURL(swURL), 10000);
-            }).catch(err => console.warn('SW регистрация не удалась:', err));
+            }).catch(err => {
+                console.error('[PWA] SW registration error', err);
+                const swSpan = document.getElementById('swStatus');
+                if (swSpan) swSpan.innerText = 'ошибка ❌';
+            });
+        } else {
+            const swSpan = document.getElementById('swStatus');
+            if (swSpan) swSpan.innerText = 'не поддерживается';
         }
-        // Отзыв URL манифеста не требуется, так как он используется постоянно
     })();
 
-    // ========== ВСЯ ОСТАЛЬНАЯ ЛОГИКА (напоминания, хранение, UI) ==========
+    // ========== ОСНОВНАЯ ЛОГИКА ПРИЛОЖЕНИЯ ==========
     let medications = [];
     let intakeHistory = [];
     let profile = { name: "", age: "", gender: "", height: "", weight: "" };
@@ -298,7 +300,7 @@
         stopReminder(medId, schedIdx, dateStr);
         if(status === "missed") {
             const med = medications.find(m => m.id === medId);
-            if(med) showNotification(`Просрочка! ${med.name} (${timeStr}) не принят.`);
+            if(med) showNotificationViaSW(`Просрочка! ${med.name} (${timeStr}) не принят.`);
         }
         renderTodayPanel(); renderCabinet(); renderSettings();
     }
@@ -306,20 +308,47 @@
         const key = `${medId}_${schedIdx}_${dateStr}`;
         if(activeReminders.has(key)) { clearInterval(activeReminders.get(key)); activeReminders.delete(key); }
     }
-    async function showNotification(body) {
-        if (!("Notification" in window)) return;
-        if (Notification.permission !== "granted") return;
-        try {
-            if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-                const registration = await navigator.serviceWorker.ready;
-                if (registration && registration.showNotification) {
-                    await registration.showNotification("TabTime", { body, icon: 'img/logo.png', badge: 'img/logo.png', vibrate: [200, 100, 200] });
-                    return;
-                }
+
+    // ГЛАВНАЯ ФУНКЦИЯ УВЕДОМЛЕНИЙ (только через Service Worker)
+    async function showNotificationViaSW(body) {
+        if (!("Notification" in window)) {
+            console.warn("Notification API не поддерживается");
+            return false;
+        }
+        if (Notification.permission !== "granted") {
+            console.warn("Нет разрешения на уведомления");
+            return false;
+        }
+        // Получаем активный Service Worker
+        const registration = await navigator.serviceWorker.ready;
+        if (registration && registration.showNotification) {
+            try {
+                await registration.showNotification("TabTime", {
+                    body: body,
+                    icon: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%2340a7e3'/%3E%3Ctext x='50' y='70' text-anchor='middle' fill='white' font-size='60'%3E💊%3C/text%3E%3C/svg%3E",
+                    badge: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%2340a7e3'/%3E%3Ctext x='50' y='70' text-anchor='middle' fill='white' font-size='60'%3E💊%3C/text%3E%3C/svg%3E",
+                    vibrate: [200, 100, 200]
+                });
+                console.log("Уведомление отправлено через SW:", body);
+                return true;
+            } catch (err) {
+                console.error("Ошибка показа через SW:", err);
+                // Fallback: обычное уведомление
+                new Notification("TabTime", { body: body });
+                return false;
             }
-            new Notification("TabTime", { body, icon: 'img/logo.png' });
-        } catch(e) { console.warn(e); }
+        } else {
+            console.warn("Service Worker не готов, используем обычное уведомление");
+            new Notification("TabTime", { body: body });
+            return false;
+        }
     }
+
+    // Обёртка для совместимости
+    async function showNotification(body) {
+        return showNotificationViaSW(body);
+    }
+
     function startReminderNotification(med, schedIdx, schedule, dateStr) {
         const key = `${med.id}_${schedIdx}_${dateStr}`;
         if(activeReminders.has(key)) return;
@@ -345,6 +374,7 @@
         activeReminders.set(key, intervalId);
         if(new Date() >= scheduleTime) showNotification(`Напоминание: примите ${med.name} в ${timeStr}`);
     }
+
     function getTodaySchedules() {
         const today = todayStr();
         const results = [];
@@ -356,6 +386,7 @@
         });
         return results;
     }
+
     function checkAndStartTodayReminders() {
         const today = todayStr();
         medications.forEach(med => {
@@ -373,6 +404,7 @@
             });
         });
     }
+
     let globalWatch = null;
     function startGlobalWatch() {
         if(globalWatch) clearInterval(globalWatch);
@@ -396,6 +428,7 @@
             renderTodayPanel(); renderCabinet(); renderSettings();
         }, 30000);
     }
+
     function calculateBMI() {
         const height = parseFloat(profile.height);
         const weight = parseFloat(profile.weight);
@@ -607,8 +640,12 @@
             alert("Сначала разрешите уведомления через кнопку 'Запросить'");
             return;
         }
-        await showNotification("✅ Тестовое уведомление! Если вы это видите, всё работает.");
-        alert("Тестовое уведомление отправлено. Проверьте, пришло ли оно.");
+        const success = await showNotification("✅ Тестовое уведомление! Если вы это видите, всё работает.");
+        if (success) {
+            alert("Уведомление отправлено через Service Worker. Проверьте, пришло ли оно.");
+        } else {
+            alert("Не удалось отправить уведомление. Проверьте консоль браузера (F12) на наличие ошибок.");
+        }
     }
 
     function initTheme() {
@@ -674,8 +711,21 @@
         window.onclick = (e) => { if(e.target === document.getElementById("medModal")) closeMedModal(); if(e.target === document.getElementById("profileModal")) document.getElementById("profileModal").style.display = "none"; };
         initTheme();
         attachRipples();
+        // Принудительно проверяем статус SW через секунду
+        setTimeout(async () => {
+            if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+                const reg = await navigator.serviceWorker.ready;
+                if (reg && reg.active) {
+                    document.getElementById('swStatus').innerText = 'активен ✅';
+                } else {
+                    document.getElementById('swStatus').innerText = 'не активен ❌';
+                }
+            } else {
+                document.getElementById('swStatus').innerText = 'не зарегистрирован';
+            }
+        }, 1000);
         if (Notification.permission === "granted") {
-            await showNotification("TabTime готов к работе");
+            await showNotification("TabTime готов к работе. Напоминания активны.");
         }
         renderSettings();
         const preloader = document.getElementById('preloader');
