@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
     <title>TabTime — умные напоминания о лекарствах</title>
     
-    <!-- PWA манифест (валидный) -->
+    <!-- PWA манифест -->
     <link rel="manifest" href="data:application/manifest+json,{
         %22name%22:%22TabTime%22,
         %22short_name%22:%22TabTime%22,
@@ -101,6 +101,11 @@
         .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .3s; border-radius: 50%; }
         input:checked + .slider { background-color: var(--accent); }
         input:checked + .slider:before { transform: translateX(24px); }
+        /* Всплывающий тост */
+        .toast { visibility: hidden; min-width: 250px; background-color: var(--accent); color: white; text-align: center; border-radius: 40px; padding: 12px 20px; position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); z-index: 200; font-weight: 500; opacity: 0; transition: opacity 0.3s, visibility 0.3s; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+        .toast.show { visibility: visible; opacity: 1; }
+        .toast.warning { background-color: var(--warning); color: #1e1e1e; }
+        .toast.success { background-color: var(--success); }
     </style>
 </head>
 <body>
@@ -108,6 +113,8 @@
 <div class="preloader" id="preloader">
     <img src="img/logo.png" alt="TabTime">
 </div>
+
+<div class="toast" id="toast">Уведомление</div>
 
 <div class="app-container">
     <div class="header">
@@ -171,21 +178,17 @@
             <button class="btn-outline" id="editProfileBtnSettings" style="margin-top: 8px;"><i class="fas fa-pen"></i> Редактировать профиль</button>
         </div>
         <div class="card">
-            <h3><i class="fas fa-bell"></i> Уведомления</h3>
+            <h3><i class="fas fa-bell"></i> Оповещения</h3>
             <div class="settings-item">
-                <span><i class="fas fa-envelope"></i> Разрешить уведомления</span>
-                <button id="requestNotifBtn" class="btn-outline">Запросить</button>
-            </div>
-            <div class="settings-item">
-                <span><i class="fas fa-vial"></i> Тест уведомления</span>
-                <button id="testNotifBtn" class="btn-outline">Проверить</button>
-            </div>
-            <div class="settings-item">
-                <span><i class="fas fa-volume-up"></i> Звук + вибрация при напоминании</span>
+                <span><i class="fas fa-sound"></i> Звук + сильная вибрация</span>
                 <label class="switch"><input type="checkbox" id="soundVibToggle" checked><span class="slider"></span></label>
             </div>
-            <p class="text-secondary">Статус разрешения: <span id="notifStatus">неизвестно</span></p>
-            <p class="text-secondary" style="font-size: 0.7rem;">* Уведомления работают через Service Worker обязательно. Если не приходят — установите приложение на главный экран.</p>
+            <div class="settings-item">
+                <span><i class="fas fa-comment-dots"></i> Всплывающие окна в приложении</span>
+                <label class="switch"><input type="checkbox" id="toastToggle" checked><span class="slider"></span></label>
+            </div>
+            <button id="testAlertBtn" class="btn-outline" style="margin-top: 8px;">🔊 Тест оповещения (звук+вибрация+тост)</button>
+            <p class="text-secondary">* Системные уведомления не работают на вашем устройстве, но звук, вибрация и всплывающие окна внутри приложения — будут точно.</p>
         </div>
         <div class="card">
             <h3><i class="fas fa-database"></i> Данные</h3>
@@ -212,82 +215,65 @@
 <div id="profileModal" class="modal"><div class="modal-card"><h3>Редактировать профиль</h3><input type="text" id="profileName" placeholder="Имя"><input type="number" id="profileAge" placeholder="Возраст"><select id="profileGender"><option value="">Пол</option><option>Мужской</option><option>Женский</option></select><input type="number" id="profileHeight" placeholder="Рост (см)"><input type="number" id="profileWeight" placeholder="Вес (кг)"><div style="display: flex; gap: 12px; margin-top: 16px;"><button id="saveProfileBtn" class="btn-primary">Сохранить</button><button id="closeProfileBtn" class="btn-outline">Закрыть</button></div></div></div>
 
 <script>
-    // ========== SERVICE WORKER (единственный способ отправки уведомлений) ==========
-    let swRegistration = null;
-    async function registerServiceWorker() {
-        if (!('serviceWorker' in navigator)) return false;
-        try {
-            const swCode = `
-                self.addEventListener('install', e => self.skipWaiting());
-                self.addEventListener('activate', e => e.waitUntil(clients.claim()));
-                self.addEventListener('notificationclick', e => { e.notification.close(); e.waitUntil(clients.openWindow('/')); });
-            `;
-            const blob = new Blob([swCode], {type: 'application/javascript'});
-            const url = URL.createObjectURL(blob);
-            const reg = await navigator.serviceWorker.register(url);
-            URL.revokeObjectURL(url);
-            swRegistration = reg;
-            // Ждём активации
-            if (reg.active) return true;
-            await new Promise(resolve => {
-                if (reg.active) resolve();
-                else reg.addEventListener('activate', () => resolve(), {once: true});
-            });
-            return true;
-        } catch(e) { console.warn('SW registration failed', e); return false; }
-    }
-
-    // Отправка уведомления через Service Worker (обязательно)
-    async function showNotificationSW(body) {
-        if (!swRegistration) {
-            await registerServiceWorker();
-        }
-        if (!swRegistration) {
-            console.warn('Service Worker не зарегистрирован');
-            return false;
-        }
-        if (Notification.permission !== "granted") return false;
-        try {
-            await swRegistration.showNotification("TabTime", {
-                body: body,
-                icon: 'img/logo.png',
-                badge: 'img/logo.png',
-                vibrate: [200, 100, 200],
-                tag: 'med-reminder'
-            });
-            return true;
-        } catch(e) {
-            console.warn('Ошибка показа уведомления через SW:', e);
-            return false;
-        }
-    }
-
-    // Звук + вибрация (опционально)
+    // ========== УЛУЧШЕННЫЕ ЗВУК И ВИБРАЦИЯ ==========
     let soundVibEnabled = true;
-    function playSoundAndVibrate() {
+    let toastEnabled = true;
+
+    function playStrongSound() {
         if (!soundVibEnabled) return;
-        // Вибрация
-        if ('vibrate' in navigator) navigator.vibrate([200, 100, 200]);
-        // Короткий звук (Web Audio)
         try {
             const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            const oscillator = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            oscillator.connect(gain);
-            gain.connect(audioCtx.destination);
-            oscillator.frequency.value = 880;
-            gain.gain.value = 0.2;
-            oscillator.start();
-            gain.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + 0.5);
-            oscillator.stop(audioCtx.currentTime + 0.5);
-        } catch(e) { /* звук не обязателен */ }
+            // Два громких сигнала
+            const playBeep = (freq, duration, startTime) => {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.frequency.value = freq;
+                gain.gain.value = 0.5;
+                osc.start(startTime);
+                gain.gain.exponentialRampToValueAtTime(0.00001, startTime + duration);
+                osc.stop(startTime + duration);
+            };
+            const now = audioCtx.currentTime;
+            playBeep(880, 0.3, now);
+            playBeep(660, 0.3, now + 0.35);
+        } catch(e) { console.warn("Sound error", e); }
     }
 
-    // ОБЩАЯ ФУНКЦИЯ ОПОВЕЩЕНИЯ (единый вход)
-    async function notifyUser(body, withSoundVib = true) {
-        if (withSoundVib) playSoundAndVibrate();
-        // Пытаемся отправить системное уведомление
-        await showNotificationSW(body);
+    function vibrateStrong() {
+        if (!soundVibEnabled) return;
+        if ('vibrate' in navigator) {
+            navigator.vibrate([300, 100, 300, 100, 500]); // длинная прерывистая
+        }
+    }
+
+    function showToast(message, type = 'info') {
+        if (!toastEnabled) return;
+        const toast = document.getElementById('toast');
+        toast.textContent = message;
+        toast.className = 'toast show';
+        if (type === 'warning') toast.classList.add('warning');
+        if (type === 'success') toast.classList.add('success');
+        setTimeout(() => { toast.classList.remove('show', 'warning', 'success'); }, 3000);
+    }
+
+    // Главная функция оповещения (звук+вибрация+тост)
+    async function notifyUser(body, important = true) {
+        if (important) {
+            playStrongSound();
+            vibrateStrong();
+        }
+        showToast(body, important ? 'warning' : 'info');
+        // Пытаемся отправить и системное уведомление (если вдруг заработает)
+        if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+            try {
+                const reg = await navigator.serviceWorker.ready;
+                if (reg && reg.showNotification) {
+                    await reg.showNotification("TabTime", { body, icon: 'img/logo.png', badge: 'img/logo.png', vibrate: [200, 100, 200] });
+                }
+            } catch(e) {}
+        }
     }
 
     // ========== ОСТАЛЬНАЯ ЛОГИКА ПРИЛОЖЕНИЯ (лекарства, расписания, профиль) ==========
@@ -359,7 +345,7 @@
             setIntakeStatus(med.id, schedIdx, dateStr, timeStr, "missed");
             return;
         }
-        const intervalId = setInterval(async () => {
+        const intervalId = setInterval(() => {
             const current = new Date();
             const diffMin = (current - scheduleTime) / 60000;
             if(diffMin > GRACE_MINUTES) {
@@ -368,7 +354,7 @@
                 renderTodayPanel();
                 return;
             }
-            await notifyUser(`Напоминание: примите ${med.name} ${med.dosageStr ? `(${med.dosageStr})` : ''} в ${timeStr}`, true);
+            notifyUser(`Напоминание: примите ${med.name} ${med.dosageStr ? `(${med.dosageStr})` : ''} в ${timeStr}`, true);
             renderTodayPanel();
         }, REMINDER_INTERVAL_MS);
         activeReminders.set(key, intervalId);
@@ -439,7 +425,7 @@
         return null;
     }
 
-    // UI Render (сокращён, но полный)
+    // UI Render (полностью рабочий)
     function renderMedicines() {
         const container = document.getElementById("medicinesList");
         if(!medications.length) { container.innerHTML = `<div class="empty-state"><i class="fas fa-capsules"></i><p>Добавьте лекарство</p></div>`; return; }
@@ -518,15 +504,15 @@
             <div class="profile-row"><i class="fas fa-calendar-alt"></i> Возраст: ${profile.age || '—'}</div>
             <div class="profile-row"><i class="fas fa-venus-mars"></i> Пол: ${profile.gender || '—'}</div>
             <div class="profile-row"><i class="fas fa-ruler"></i> Рост/Вес: ${profile.height||'—'} см / ${profile.weight||'—'} кг</div>`;
-        const ns = document.getElementById("notifStatus");
-        if(Notification.permission === "granted") ns.innerText = "разрешены ✅";
-        else if(Notification.permission === "denied") ns.innerText = "заблокированы ❌";
-        else ns.innerText = "не запрошены ⚠️";
-        // чекбокс звука
         const soundCheck = document.getElementById('soundVibToggle');
         if (soundCheck) {
             soundCheck.checked = soundVibEnabled;
             soundCheck.onchange = (e) => { soundVibEnabled = e.target.checked; };
+        }
+        const toastCheck = document.getElementById('toastToggle');
+        if (toastCheck) {
+            toastCheck.checked = toastEnabled;
+            toastCheck.onchange = (e) => { toastEnabled = e.target.checked; };
         }
     }
     function deleteMedicine(id) {
@@ -624,35 +610,8 @@
 
     function resetRating() { if(confirm("Сбросить историю?")) { intakeHistory=[]; saveHistory(); renderTodayPanel(); renderCabinet(); renderSettings(); notifyUser("История очищена", false); } }
     function resetAllData() { if(confirm("Полный сброс?")) { medications=[]; intakeHistory=[]; profile={name:"",age:"",gender:"",height:"",weight:""}; saveMeds(); saveHistory(); saveProfile(); for(let [k,iv] of activeReminders) clearInterval(iv); activeReminders.clear(); renderMedicines(); renderTodayPanel(); renderCabinet(); renderSettings(); notifyUser("Все данные сброшены", false); } }
-    
-    async function requestNotificationPermission() {
-        if (!("Notification" in window)) { alert("Ваш браузер не поддерживает уведомления"); return; }
-        if (Notification.permission === "default") {
-            const perm = await Notification.requestPermission();
-            renderSettings();
-            if (perm === "granted") {
-                // после разрешения — регистрируем SW и отправляем тест
-                await registerServiceWorker();
-                await notifyUser("✅ Уведомления включены! Теперь вы будете получать напоминания.", true);
-            } else if (perm === "denied") {
-                alert("Вы запретили уведомления. Чтобы их включить, измените настройки браузера для этого сайта.");
-            }
-        } else if (Notification.permission === "denied") {
-            alert("Уведомления заблокированы. Пожалуйста, разрешите их в настройках браузера.");
-        } else {
-            alert("Уведомления уже разрешены");
-            await notifyUser("Тестовое уведомление работает!", true);
-        }
-    }
-    
-    async function testNotification() {
-        if (Notification.permission !== "granted") {
-            alert("Сначала разрешите уведомления через кнопку 'Запросить'");
-            return;
-        }
-        await registerServiceWorker();
-        const result = await notifyUser("✅ Тестовое уведомление! Если вы это видите, всё работает.", true);
-        alert("Тестовое уведомление отправлено (через Service Worker). Пожалуйста, проверьте, пришло ли оно.");
+    async function testAlert() {
+        notifyUser("🔊 Тестовое оповещение: звук + вибрация + всплывающее окно", true);
     }
 
     function initTheme() {
@@ -710,18 +669,14 @@
         document.getElementById("editProfileBtnSettings").onclick = openProfileModal;
         document.getElementById("saveProfileBtn").onclick = saveProfileFromModal;
         document.getElementById("closeProfileBtn").onclick = () => document.getElementById("profileModal").style.display = "none";
-        document.getElementById("requestNotifBtn").onclick = requestNotificationPermission;
-        document.getElementById("testNotifBtn").onclick = testNotification;
+        document.getElementById("testAlertBtn").onclick = testAlert;
         document.getElementById("resetRatingBtn").onclick = resetRating;
         document.getElementById("resetAllBtn").onclick = resetAllData;
         document.querySelectorAll(".nav-item").forEach(btn => btn.addEventListener("click", () => setActivePanel(btn.dataset.panel)));
         window.onclick = (e) => { if(e.target === document.getElementById("medModal")) closeMedModal(); if(e.target === document.getElementById("profileModal")) document.getElementById("profileModal").style.display = "none"; };
         initTheme();
         attachRipples();
-        // Регистрируем Service Worker заранее
-        await registerServiceWorker();
         renderSettings();
-        // Скрытие прелоадера
         setTimeout(() => { const preloader = document.getElementById('preloader'); if (preloader) preloader.classList.add('hide'); }, 1500);
     }
     init();
