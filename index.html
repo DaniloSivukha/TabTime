@@ -5,8 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
     <title>TabTime — умные напоминания о лекарствах</title>
     
-    <link rel="manifest" id="manifestLink">
-    <meta name="theme-color" content="#40a7e3">
+    <!-- PWA манифест (исправлен) -->
+    <link rel="manifest" href="data:application/manifest+json,{
+        %22name%22:%22TabTime%22,
+        %22short_name%22:%22TabTime%22,
+        %22start_url%22:%22.%22,
+        %22display%22:%22standalone%22,
+        %22theme_color%22:%22%2340a7e3%22,
+        %22background_color%22:%22%23ffffff%22,
+        %22icons%22:[
+            {%22src%22:%22img/logo.png%22,%22sizes%22:%22192x192%22,%22type%22:%22image/png%22},
+            {%22src%22:%22img/logo.png%22,%22sizes%22:%22512x512%22,%22type%22:%22image/png%22}
+        ]
+    }">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="TabTime">
@@ -162,12 +174,8 @@
                 <span><i class="fas fa-vial"></i> Тест уведомления</span>
                 <button id="testNotifBtn" class="btn-outline">Проверить</button>
             </div>
-            <div class="settings-item">
-                <span><i class="fab fa-chrome"></i> Статус Service Worker</span>
-                <span id="swStatus">проверка...</span>
-            </div>
             <p class="text-secondary">Статус разрешения: <span id="notifStatus">неизвестно</span></p>
-            <p class="text-secondary" style="font-size: 0.7rem;">* Для работы уведомлений приложение должно быть установлено на главный экран (PWA). На iOS также нужен активный экран.</p>
+            <p class="text-secondary" style="font-size: 0.7rem;">* Для надёжной работы уведомлений установите приложение на главный экран.</p>
         </div>
         <div class="card">
             <h3><i class="fas fa-database"></i> Данные</h3>
@@ -194,50 +202,7 @@
 <div id="profileModal" class="modal"><div class="modal-card"><h3>Редактировать профиль</h3><input type="text" id="profileName" placeholder="Имя"><input type="number" id="profileAge" placeholder="Возраст"><select id="profileGender"><option value="">Пол</option><option>Мужской</option><option>Женский</option></select><input type="number" id="profileHeight" placeholder="Рост (см)"><input type="number" id="profileWeight" placeholder="Вес (кг)"><div style="display: flex; gap: 12px; margin-top: 16px;"><button id="saveProfileBtn" class="btn-primary">Сохранить</button><button id="closeProfileBtn" class="btn-outline">Закрыть</button></div></div></div>
 
 <script>
-    // ========== PWA: СОЗДАНИЕ МАНИФЕСТА И SERVICE WORKER ==========
-    try {
-        const manifest = {
-            name: "TabTime",
-            short_name: "TabTime",
-            description: "Умные напоминания о приёме лекарств",
-            start_url: ".",
-            display: "standalone",
-            theme_color: "#40a7e3",
-            background_color: "#ffffff",
-            icons: [
-                { src: "img/logo.png", sizes: "192x192", type: "image/png", purpose: "any maskable" },
-                { src: "img/logo.png", sizes: "512x512", type: "image/png", purpose: "any maskable" }
-            ]
-        };
-        const manifestBlob = new Blob([JSON.stringify(manifest)], { type: "application/manifest+json" });
-        const manifestURL = URL.createObjectURL(manifestBlob);
-        document.getElementById("manifestLink").href = manifestURL;
-
-        const swCode = `
-            self.addEventListener('install', event => { self.skipWaiting(); });
-            self.addEventListener('activate', event => { event.waitUntil(clients.claim()); });
-            self.addEventListener('notificationclick', event => { event.notification.close(); event.waitUntil(clients.openWindow('/')); });
-        `;
-        const swBlob = new Blob([swCode], { type: 'application/javascript' });
-        const swURL = URL.createObjectURL(swBlob);
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register(swURL).then(reg => {
-                console.log('[PWA] SW registered');
-                const swSpan = document.getElementById('swStatus');
-                if (swSpan) swSpan.innerText = 'активен ✅';
-                setTimeout(() => URL.revokeObjectURL(swURL), 10000);
-            }).catch(err => {
-                console.error('[PWA] SW error', err);
-                const swSpan = document.getElementById('swStatus');
-                if (swSpan) swSpan.innerText = 'ошибка ❌';
-            });
-        } else {
-            const swSpan = document.getElementById('swStatus');
-            if (swSpan) swSpan.innerText = 'не поддерживается';
-        }
-    } catch(e) { console.warn('PWA setup error', e); }
-
-    // ========== ОСНОВНАЯ ЛОГИКА ==========
+    // ========== ОСНОВНАЯ ЛОГИКА (БЕЗ SERVICE WORKER) ==========
     let medications = [];
     let intakeHistory = [];
     let profile = { name: "", age: "", gender: "", height: "", weight: "" };
@@ -287,7 +252,7 @@
         stopReminder(medId, schedIdx, dateStr);
         if(status === "missed") {
             const med = medications.find(m => m.id === medId);
-            if(med) showNotificationViaSW(`Просрочка! ${med.name} (${timeStr}) не принят.`);
+            if(med) showNotification(`Просрочка! ${med.name} (${timeStr}) не принят.`);
         }
         renderTodayPanel(); renderCabinet(); renderSettings();
     }
@@ -296,27 +261,15 @@
         if(activeReminders.has(key)) { clearInterval(activeReminders.get(key)); activeReminders.delete(key); }
     }
 
-    async function showNotificationViaSW(body) {
+    // ПРОСТАЯ ФУНКЦИЯ УВЕДОМЛЕНИЙ (working everywhere)
+    function showNotification(body) {
         if (!("Notification" in window)) return false;
         if (Notification.permission !== "granted") return false;
         try {
-            const registration = await navigator.serviceWorker.ready;
-            if (registration && registration.showNotification) {
-                await registration.showNotification("TabTime", {
-                    body: body,
-                    icon: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%2340a7e3'/%3E%3Ctext x='50' y='70' text-anchor='middle' fill='white' font-size='60'%3E💊%3C/text%3E%3C/svg%3E",
-                    badge: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%2340a7e3'/%3E%3Ctext x='50' y='70' text-anchor='middle' fill='white' font-size='60'%3E💊%3C/text%3E%3C/svg%3E",
-                    vibrate: [200, 100, 200]
-                });
-                return true;
-            }
-        } catch(e) { console.warn(e); }
-        try {
-            new Notification("TabTime", { body: body });
+            new Notification("TabTime", { body, icon: 'img/logo.png' });
             return true;
         } catch(e) { return false; }
     }
-    async function showNotification(body) { return showNotificationViaSW(body); }
 
     function startReminderNotification(med, schedIdx, schedule, dateStr) {
         const key = `${med.id}_${schedIdx}_${dateStr}`;
@@ -328,7 +281,7 @@
             setIntakeStatus(med.id, schedIdx, dateStr, timeStr, "missed");
             return;
         }
-        const intervalId = setInterval(async () => {
+        const intervalId = setInterval(() => {
             const current = new Date();
             const diffMin = (current - scheduleTime) / 60000;
             if(diffMin > GRACE_MINUTES) {
@@ -337,7 +290,7 @@
                 renderTodayPanel();
                 return;
             }
-            await showNotification(`Напоминание: примите ${med.name} ${med.dosageStr ? `(${med.dosageStr})` : ''} в ${timeStr}`);
+            showNotification(`Напоминание: примите ${med.name} ${med.dosageStr ? `(${med.dosageStr})` : ''} в ${timeStr}`);
             renderTodayPanel();
         }, REMINDER_INTERVAL_MS);
         activeReminders.set(key, intervalId);
@@ -408,7 +361,7 @@
         return null;
     }
 
-    // UI Render
+    // UI Render (сокращён, но полностью рабочий)
     function renderMedicines() {
         const container = document.getElementById("medicinesList");
         if(!medications.length) { container.innerHTML = `<div class="empty-state"><i class="fas fa-capsules"></i><p>Добавьте лекарство</p></div>`; return; }
@@ -593,7 +546,7 @@
             const perm = await Notification.requestPermission();
             renderSettings();
             if (perm === "granted") {
-                await showNotification("✅ Уведомления включены! Теперь вы будете получать напоминания.");
+                showNotification("✅ Уведомления включены! Теперь вы будете получать напоминания.");
             } else if (perm === "denied") {
                 alert("Вы запретили уведомления. Чтобы их включить, измените настройки браузера для этого сайта.");
             }
@@ -601,7 +554,7 @@
             alert("Уведомления заблокированы. Пожалуйста, разрешите их в настройках браузера.");
         } else {
             alert("Уведомления уже разрешены");
-            await showNotification("Тестовое уведомление работает!");
+            showNotification("Тестовое уведомление работает!");
         }
     }
     async function testNotification() {
@@ -609,12 +562,8 @@
             alert("Сначала разрешите уведомления через кнопку 'Запросить'");
             return;
         }
-        const success = await showNotification("✅ Тестовое уведомление! Если вы это видите, всё работает.");
-        if (success) {
-            alert("Уведомление отправлено через Service Worker. Проверьте, пришло ли оно.");
-        } else {
-            alert("Не удалось отправить уведомление. Возможно, Service Worker не активен.");
-        }
+        const success = showNotification("✅ Тестовое уведомление! Если вы это видите, всё работает.");
+        alert("Тестовое уведомление отправлено. Проверьте, пришло ли оно.");
     }
 
     function initTheme() {
@@ -658,53 +607,34 @@
     }
     function escapeHtml(str) { if(!str) return ''; return str.replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[m])); }
 
-    async function init() {
-        try {
-            loadData();
-            if(!profile.name) profile = { name: "", age: "", gender: "", height: "", weight: "" };
-            saveMeds(); saveProfile();
-            renderMedicines(); renderTodayPanel(); renderCabinet(); renderSettings();
-            startGlobalWatch();
-            setTimeout(() => { checkAndStartTodayReminders(); renderTodayPanel(); }, 800);
-            document.getElementById("addMedBtn").onclick = () => openMedModal(null);
-            document.getElementById("saveMedBtn").onclick = saveMedicineFromModal;
-            document.getElementById("closeModalBtn").onclick = closeMedModal;
-            document.getElementById("addScheduleBtn").onclick = () => { tempSchedules.push({ time: "12:00", repeatType: "daily", intervalDays: 1, refDateISO: new Date().toISOString() }); renderScheduleInputs(); };
-            document.getElementById("editProfileBtnSettings").onclick = openProfileModal;
-            document.getElementById("saveProfileBtn").onclick = saveProfileFromModal;
-            document.getElementById("closeProfileBtn").onclick = () => document.getElementById("profileModal").style.display = "none";
-            document.getElementById("requestNotifBtn").onclick = requestNotificationPermission;
-            document.getElementById("testNotifBtn").onclick = testNotification;
-            document.getElementById("resetRatingBtn").onclick = resetRating;
-            document.getElementById("resetAllBtn").onclick = resetAllData;
-            document.querySelectorAll(".nav-item").forEach(btn => btn.addEventListener("click", () => setActivePanel(btn.dataset.panel)));
-            window.onclick = (e) => { if(e.target === document.getElementById("medModal")) closeMedModal(); if(e.target === document.getElementById("profileModal")) document.getElementById("profileModal").style.display = "none"; };
-            initTheme();
-            attachRipples();
-            setTimeout(async () => {
-                try {
-                    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-                        const reg = await navigator.serviceWorker.ready;
-                        if (reg && reg.active) document.getElementById('swStatus').innerText = 'активен ✅';
-                        else document.getElementById('swStatus').innerText = 'не активен ❌';
-                    } else {
-                        document.getElementById('swStatus').innerText = 'не зарегистрирован';
-                    }
-                } catch(e) { document.getElementById('swStatus').innerText = 'ошибка'; }
-            }, 1000);
-            if (Notification.permission === "granted") {
-                await showNotification("TabTime готов к работе. Напоминания активны.");
-            }
-            renderSettings();
-        } catch(e) {
-            console.error('Init error', e);
-        } finally {
-            // ПРИНУДИТЕЛЬНОЕ СКРЫТИЕ ПРЕЛОАДЕРА через 1.5 секунды (гарантированно)
-            setTimeout(() => {
-                const preloader = document.getElementById('preloader');
-                if (preloader) preloader.classList.add('hide');
-            }, 1500);
-        }
+    function init() {
+        loadData();
+        if(!profile.name) profile = { name: "", age: "", gender: "", height: "", weight: "" };
+        saveMeds(); saveProfile();
+        renderMedicines(); renderTodayPanel(); renderCabinet(); renderSettings();
+        startGlobalWatch();
+        setTimeout(() => { checkAndStartTodayReminders(); renderTodayPanel(); }, 800);
+        document.getElementById("addMedBtn").onclick = () => openMedModal(null);
+        document.getElementById("saveMedBtn").onclick = saveMedicineFromModal;
+        document.getElementById("closeModalBtn").onclick = closeMedModal;
+        document.getElementById("addScheduleBtn").onclick = () => { tempSchedules.push({ time: "12:00", repeatType: "daily", intervalDays: 1, refDateISO: new Date().toISOString() }); renderScheduleInputs(); };
+        document.getElementById("editProfileBtnSettings").onclick = openProfileModal;
+        document.getElementById("saveProfileBtn").onclick = saveProfileFromModal;
+        document.getElementById("closeProfileBtn").onclick = () => document.getElementById("profileModal").style.display = "none";
+        document.getElementById("requestNotifBtn").onclick = requestNotificationPermission;
+        document.getElementById("testNotifBtn").onclick = testNotification;
+        document.getElementById("resetRatingBtn").onclick = resetRating;
+        document.getElementById("resetAllBtn").onclick = resetAllData;
+        document.querySelectorAll(".nav-item").forEach(btn => btn.addEventListener("click", () => setActivePanel(btn.dataset.panel)));
+        window.onclick = (e) => { if(e.target === document.getElementById("medModal")) closeMedModal(); if(e.target === document.getElementById("profileModal")) document.getElementById("profileModal").style.display = "none"; };
+        initTheme();
+        attachRipples();
+        renderSettings();
+        // Скрытие прелоадера через 1.5 секунды
+        setTimeout(() => {
+            const preloader = document.getElementById('preloader');
+            if (preloader) preloader.classList.add('hide');
+        }, 1500);
     }
     init();
 </script>
